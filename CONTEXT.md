@@ -30,6 +30,10 @@ _Avoid_: Badge, indicator
 The popup that opens anchored above the Tray Icon on left-click and closes when the user clicks anywhere else. It has two Views, switched with tabs at its top: the Metrics View and the Processes View.
 _Avoid_: Widget, window, dashboard, menu, flyout
 
+**Desktop Widget**:
+The optional, observe-only card the user places on the desktop, showing Metrics with their Sparklines. Turned on and off from the Tray Menu, stays behind all other windows and remembers its position. Not part of the Panel.
+_Avoid_: Gadget, overlay, Panel (for this term)
+
 **Metrics View**:
 The Panel's default View: all Metrics and App Volumes.
 _Avoid_: Main tab, home
