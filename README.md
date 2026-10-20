@@ -33,9 +33,10 @@ bloated or full of ads. Computer Stats lives in the system tray, uses about **4 
   notice it without opening anything. No pop-ups, no sounds.
 - **Processes tab** — every running program with its icon, CPU and memory use, sorted by CPU or
   memory. Click **End**, then **Confirm?**, to close a program that is stuck or hogging the PC.
-- **Desktop widget (optional)** — CPU, GPU and memory with their graphs, drawn straight on your
-  wallpaper. Turn it on from the tray menu and drag it anywhere. It stays behind your windows
-  and comes back where you left it. Off by default.
+- **Desktop widget (optional)** — CPU, GPU and memory with their graphs, on a see-through card
+  on your wallpaper. Turn it on from the tray menu and drag it anywhere. It stays behind your
+  windows, shows up when you go to the desktop (Win+D), and comes back where you left it. Off by
+  default.
 - **Start with Windows** — one click in the tray menu; starts at sign-in without a UAC prompt.
 - **Light and dark theme**, any taskbar position, multiple monitors and high-DPI screens.
 - **Native and lightweight** — written in Rust with a natively rendered UI: no browser engine, no
@@ -213,6 +214,7 @@ has a specification, a plan, research notes and a task list before any code.
 | 002 — Tray icon and Metrics panel | [`specs/002-tray-metrics-panel`](specs/002-tray-metrics-panel) |
 | 003 — Processes tab with End App | [`specs/003-processes-view`](specs/003-processes-view) |
 | 004 — Intel CPU temperature, PawnIO from the installer | [`specs/004-intel-cpu-temperature`](specs/004-intel-cpu-temperature) |
+| 005 — Optional Desktop Widget | [`specs/005-desktop-widget`](specs/005-desktop-widget) |
 
 ## License
 
