@@ -200,8 +200,8 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
   NVIDIA GeForce GTX 1660 SUPER; Windows reports no fans through its own management interface.
 - PawnIO.Modules 0.2.11 includes `LpcIO.bin`, which gives access to the motherboard's monitoring
   chip (Super I/O). The chips supported are the Nuvoton NCT6796D–NCT6799D and NCT6701D family
-  found on current ASUS, MSI and Gigabyte desktop boards; others give `— unsupported motherboard`
-  until added.
+  (ASUS, MSI) and the ITE IT8628E, IT8686E and IT8688E (Gigabyte; research R9); others give
+  `— unsupported motherboard` until added.
 - Spike S1 (2026-10-20): the developer's board has a Nuvoton NCT6701D whose firmware sets the
   read lock. Since the revision of FR-006 the app clears it, so the fans are validated on the
   developer's PC.
@@ -227,3 +227,6 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
 - Q (revisited 2026-10-20, after 0.4.0): should the app clear the firmware's read lock after all,
   as iCUE does? → A: Yes. The user reversed the earlier answer: the app clears only the I/O space
   lock bit, never any other chip setting (FR-006).
+- Q (2026-10-20): should Gigabyte boards be supported, as on a user's B550M AORUS ELITE where iCUE
+  shows every fan? → A: Yes: ITE IT8628E / IT8686E / IT8688E (research R9), validated by that
+  user.

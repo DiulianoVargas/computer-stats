@@ -38,6 +38,8 @@ cargo run --example fan_spike -- target\package\modules-extract\LpcIO.bin
 | F8 | Run the exe without elevation (`examples/app_unelevated` style) | Fans: `— not elevated`; GPU Fan still works |
 | F9 | PC with an integrated GPU only | GPU Fan shows `— no GPU`, like the other GPU rows |
 | F10 | `scripts/measure.ps1`, 10 min, Panel closed, widget off | Within budgets (≤ 30 MB, < 0.5 % CPU); exe ≤ 10 MB (SC-005) |
+| G1 | Gigabyte B550M AORUS ELITE (ITE IT8688E): open the Panel | Fans lists each fan iCUE shows (e.g. 2 fans), RPM within 5 % of iCUE / HWiNFO |
+| G2 | On G1's PC, run iCUE at the same time for 5 min | Both keep showing the same fans; no wrong spikes in either (R5) |
 
 ## Results
 
@@ -48,5 +50,6 @@ cargo run --example fan_spike -- target\package\modules-extract\LpcIO.bin
 | F3 | Pass | Widget grew 206 → 214 px: one Fan row in the GPU group, none in the CPU group; checked on screen by the user |
 | F4 | Pass in part (after FR-006 revision) | Developer's PC, lock cleared by the app: two Fans shown, about 700 and 3200 RPM. Not yet compared with HWiNFO; header names not yet mapped |
 | F5–F6 | Pending | |
+| G1–G2 | Pending | Needs the Gigabyte B550M user |
 | F7–F9 | Pending | Each reason is covered by unit tests (`metric::Reason`, `domain::fan`); manual runs pending |
 | F10 | See [measurements.md](measurements.md) | |

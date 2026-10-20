@@ -4,20 +4,67 @@
 use super::history::History;
 use super::metric::{MAX_FAN_RPM, MetricKind, Reading, Reason};
 
-/// The 13-bit fan count registers of the Nuvoton NCT6796D–NCT6799D / NCT6701D family, in channel
-/// order (research R3).
-const NUVOTON_CHANNELS: [u16; 7] = [0x4B0, 0x4B2, 0x4B4, 0x4B6, 0x4B8, 0x4BA, 0x4CC];
+/// The two chip families the app reads, which differ in how they are entered and how a fan's
+/// registers turn into RPM (research R3, R9).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChipFamily {
+    /// Nuvoton NCT67xx: 13-bit fan counts in bank 4.
+    Nuvoton,
+    /// ITE IT86xx (Gigabyte boards): 16-bit fan counts, no banks.
+    Ite,
+}
+
+/// The two registers holding one channel's fan count. For Nuvoton the high byte includes the bank
+/// (`0x4B0` = bank 4, register `0xB0`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FanRegisters {
+    pub high: u16,
+    pub low: u16,
+}
+
+const fn nuvoton(address: u16) -> FanRegisters {
+    FanRegisters {
+        high: address,
+        low: address + 1,
+    }
+}
+
+const fn ite(low: u16, high: u16) -> FanRegisters {
+    FanRegisters { high, low }
+}
+
+/// The NCT6796D–NCT6799D / NCT6701D fan counts, in channel order (research R3).
+const NUVOTON_CHANNELS: [FanRegisters; 7] = [
+    nuvoton(0x4B0),
+    nuvoton(0x4B2),
+    nuvoton(0x4B4),
+    nuvoton(0x4B6),
+    nuvoton(0x4B8),
+    nuvoton(0x4BA),
+    nuvoton(0x4CC),
+];
+
+/// The IT8628E / IT8686E / IT8688E fan counts, in channel order (research R9).
+const ITE_CHANNELS: [FanRegisters; 6] = [
+    ite(0x0D, 0x18),
+    ite(0x0E, 0x19),
+    ite(0x0F, 0x1A),
+    ite(0x80, 0x81),
+    ite(0x82, 0x83),
+    ite(0x4C, 0x4D),
+];
 
 /// A supported motherboard monitoring chip.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FanChip {
     /// For diagnostics only.
     pub name: &'static str,
-    /// Fan count register per channel, in channel order.
-    pub channels: &'static [u16],
+    pub family: ChipFamily,
+    /// Fan count registers per channel, in channel order.
+    pub channels: &'static [FanRegisters],
 }
 
-/// The chip for a Super I/O chip ID and revision (research R3); `None` → unsupported motherboard.
+/// The Nuvoton chip for a Super I/O chip ID and revision (research R3); `None` → not one we read.
 pub fn fan_chip(id: u8, revision: u8) -> Option<FanChip> {
     let (name, count) = match (id, revision) {
         (0xD4, 0x23) => ("Nuvoton NCT6796D", 6),
@@ -30,8 +77,37 @@ pub fn fan_chip(id: u8, revision: u8) -> Option<FanChip> {
     };
     Some(FanChip {
         name,
+        family: ChipFamily::Nuvoton,
         channels: &NUVOTON_CHANNELS[..count],
     })
+}
+
+/// The ITE chip for a 16-bit chip ID (research R9); `None` → not one we read.
+pub fn ite_chip(id: u16) -> Option<FanChip> {
+    let name = match id {
+        0x8628 => "ITE IT8628E",
+        0x8686 => "ITE IT8686E",
+        0x8688 => "ITE IT8688E",
+        _ => return None,
+    };
+    Some(FanChip {
+        name,
+        family: ChipFamily::Ite,
+        channels: &ITE_CHANNELS,
+    })
+}
+
+/// ITE channels 4–6 count only when enabled in the fan tachometer mode register (`0x0C`): bit 4
+/// for channel 4, bit 5 for channel 5, bit 2 for channel 6. Returns a mask of disabled channels
+/// (bit `i` = channel `i + 1`).
+pub fn ite_disabled_channels(modes: u8) -> u8 {
+    let mut disabled = 0;
+    for (channel, bit) in [(3, 4), (4, 5), (5, 2)] {
+        if modes & (1 << bit) == 0 {
+            disabled |= 1 << channel;
+        }
+    }
+    disabled
 }
 
 /// Whether a hardware monitor base address is usable: at least 0x100 and 8-byte aligned within a
@@ -53,16 +129,35 @@ pub enum FanSample {
 const MAX_COUNT: u32 = 0x1FFF;
 const MIN_COUNT: u32 = 0x15;
 
-/// Converts a channel's 13-bit fan count (`high << 5 | low & 0x1F`) into a sample.
-pub fn fan_speed(high: u8, low: u8) -> FanSample {
-    let count = (u32::from(high) << 5) | (u32::from(low) & 0x1F);
-    if count >= MAX_COUNT {
-        return FanSample::Stopped;
-    }
-    if count < MIN_COUNT {
-        return FanSample::Invalid;
-    }
-    let rpm = 1_350_000.0 / count as f32;
+/// ITE: the 16-bit count at or below this is a misread.
+const ITE_MIN_COUNT: u32 = 0x3F;
+
+/// Converts a channel's two count bytes into a sample. Nuvoton: 13-bit count
+/// (`high << 5 | low & 0x1F`), RPM = 1 350 000 / count. ITE: 16-bit count, RPM = 1 350 000 /
+/// (2 × count).
+pub fn fan_speed(family: ChipFamily, high: u8, low: u8) -> FanSample {
+    let rpm = match family {
+        ChipFamily::Nuvoton => {
+            let count = (u32::from(high) << 5) | (u32::from(low) & 0x1F);
+            if count >= MAX_COUNT {
+                return FanSample::Stopped;
+            }
+            if count < MIN_COUNT {
+                return FanSample::Invalid;
+            }
+            1_350_000.0 / count as f32
+        }
+        ChipFamily::Ite => {
+            let count = (u32::from(high) << 8) | u32::from(low);
+            if count == 0xFFFF {
+                return FanSample::Stopped;
+            }
+            if count <= ITE_MIN_COUNT {
+                return FanSample::Invalid;
+            }
+            1_350_000.0 / (2 * count) as f32
+        }
+    };
     if rpm > MAX_FAN_RPM {
         FanSample::Invalid
     } else {
@@ -211,7 +306,13 @@ mod tests {
         );
         assert_eq!(fan_chip(0xD8, 0x06).map(|c| c.channels.len()), Some(7));
         assert_eq!(fan_chip(0xD4, 0x23).map(|c| c.channels.len()), Some(6));
-        assert_eq!(fan_chip(0xD8, 0x02).map(|c| c.channels[6]), Some(0x4CC));
+        assert_eq!(
+            fan_chip(0xD8, 0x02).map(|c| c.channels[6]),
+            Some(FanRegisters {
+                high: 0x4CC,
+                low: 0x4CD
+            })
+        );
         for (id, rev) in [(0xD4, 0x2A), (0xD4, 0x51), (0xD4, 0x2B)] {
             assert!(fan_chip(id, rev).is_some());
         }
@@ -222,6 +323,49 @@ mod tests {
         assert_eq!(fan_chip(0xD5, 0x92), None); // NCT6687D: another layout
         assert_eq!(fan_chip(0xFF, 0xFF), None);
         assert_eq!(fan_chip(0x00, 0x00), None);
+    }
+
+    #[test]
+    fn ite_chips() {
+        let chip = ite_chip(0x8688);
+        assert_eq!(chip.map(|c| c.name), Some("ITE IT8688E"));
+        assert_eq!(chip.map(|c| c.family), Some(ChipFamily::Ite));
+        assert_eq!(chip.map(|c| c.channels.len()), Some(6));
+        assert_eq!(
+            chip.map(|c| c.channels[3]),
+            Some(FanRegisters {
+                high: 0x81,
+                low: 0x80
+            })
+        );
+        assert!(ite_chip(0x8686).is_some() && ite_chip(0x8628).is_some());
+        assert_eq!(ite_chip(0x8689), None); // banked registers: not read yet
+        assert_eq!(ite_chip(0xFFFF), None);
+    }
+
+    #[test]
+    fn ite_count_to_rpm() {
+        // count 0x0186 = 390 → 1 350 000 / 780 ≈ 1731 RPM.
+        assert!(
+            matches!(fan_speed(ChipFamily::Ite, 0x01, 0x86), FanSample::Rpm(r) if (1730.0..1732.0).contains(&r))
+        );
+        assert_eq!(fan_speed(ChipFamily::Ite, 0xFF, 0xFF), FanSample::Stopped);
+        assert_eq!(fan_speed(ChipFamily::Ite, 0x00, 0x3F), FanSample::Invalid);
+        // 0x40 = 64 → 10 547 RPM: above the plausible range.
+        assert_eq!(fan_speed(ChipFamily::Ite, 0x00, 0x40), FanSample::Invalid);
+        // 0x44 = 68 → 9926 RPM.
+        assert!(matches!(
+            fan_speed(ChipFamily::Ite, 0x00, 0x44),
+            FanSample::Rpm(_)
+        ));
+    }
+
+    #[test]
+    fn ite_disabled_channels_follow_the_mode_register() {
+        assert_eq!(ite_disabled_channels(0x00), 0b11_1000);
+        assert_eq!(ite_disabled_channels(0b11_0100), 0);
+        // Channel 4 enabled only.
+        assert_eq!(ite_disabled_channels(0b01_0000), 0b11_0000);
     }
 
     #[test]
@@ -237,23 +381,46 @@ mod tests {
     #[test]
     fn count_to_rpm() {
         // count 1125 = 0x465: high 0x23, low 0x05 → 1200 RPM.
-        assert_eq!(fan_speed(0x23, 0x05), FanSample::Rpm(1200.0));
+        assert_eq!(
+            fan_speed(ChipFamily::Nuvoton, 0x23, 0x05),
+            FanSample::Rpm(1200.0)
+        );
         // Upper bits of `low` are ignored.
-        assert_eq!(fan_speed(0x23, 0xE5), FanSample::Rpm(1200.0));
+        assert_eq!(
+            fan_speed(ChipFamily::Nuvoton, 0x23, 0xE5),
+            FanSample::Rpm(1200.0)
+        );
     }
 
     #[test]
     fn count_boundaries() {
         // 0x1FFF and above (all ones, as a locked chip also reads) → stopped.
-        assert_eq!(fan_speed(0xFF, 0x1F), FanSample::Stopped);
+        assert_eq!(
+            fan_speed(ChipFamily::Nuvoton, 0xFF, 0x1F),
+            FanSample::Stopped
+        );
         // 0x1FFE → the slowest readable speed.
-        assert!(matches!(fan_speed(0xFF, 0x1E), FanSample::Rpm(r) if (164.0..166.0).contains(&r)));
+        assert!(
+            matches!(fan_speed(ChipFamily::Nuvoton, 0xFF, 0x1E), FanSample::Rpm(r) if (164.0..166.0).contains(&r))
+        );
         // Below 0x15 → misread.
-        assert_eq!(fan_speed(0x00, 0x14), FanSample::Invalid);
-        assert_eq!(fan_speed(0x00, 0x00), FanSample::Invalid);
+        assert_eq!(
+            fan_speed(ChipFamily::Nuvoton, 0x00, 0x14),
+            FanSample::Invalid
+        );
+        assert_eq!(
+            fan_speed(ChipFamily::Nuvoton, 0x00, 0x00),
+            FanSample::Invalid
+        );
         // 0x15..0x86 → above 10 000 RPM → misread; 0x87 (135) → 10 000 RPM exactly.
-        assert_eq!(fan_speed(0x00, 0x15), FanSample::Invalid);
-        assert_eq!(fan_speed(0x04, 0x07), FanSample::Rpm(10_000.0));
+        assert_eq!(
+            fan_speed(ChipFamily::Nuvoton, 0x00, 0x15),
+            FanSample::Invalid
+        );
+        assert_eq!(
+            fan_speed(ChipFamily::Nuvoton, 0x04, 0x07),
+            FanSample::Rpm(10_000.0)
+        );
     }
 
     #[test]

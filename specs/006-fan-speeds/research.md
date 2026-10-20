@@ -112,3 +112,24 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
   one mutex hold: well under 1 ms. While locked or unsupported: nothing per tick, one detection
   every 60 s (locked) or never (unsupported).
 - Memory: one `History` (60 × `Option<f32>`) per shown fan, at most 8 (7 + GPU).
+
+## R9. ITE chips (Gigabyte boards)
+
+- **Context (2026-10-20)**: a user's PC with a Gigabyte B550M AORUS ELITE showed every fan in
+  iCUE but would get `— unsupported motherboard` here: Gigabyte boards use ITE chips.
+- **Decision**: support the ITE IT8628E, IT8686E and IT8688E, which share one register layout and
+  need no bank select (LibreHardwareMonitor `IT87XX.cs`, reimplemented from the register map).
+  IT8689E (banked registers) and the second ITE chip some Gigabyte boards have (IT879x on port
+  0x4E, behind a Gigabyte embedded controller) are left out.
+- **Detection**: after the Nuvoton attempt on port 0x2E fails, enter ITE configuration mode with
+  `87 01 55 55`, read the 16-bit chip ID (`0x20` high, `0x21` low), `find_bars`, select logical
+  device `0x04` (environment controller), read the base `0x60` twice; exit by writing `0x02` to
+  configuration register `0x02`. ITE chips have no read lock.
+- **Fan read**: no banks; index `base+5`, data `base+6`. Channel registers (low / high):
+  `0x0D/0x18`, `0x0E/0x19`, `0x0F/0x1A`, `0x80/0x81`, `0x82/0x83`, `0x4C/0x4D`.
+  `count = high << 8 | low`: `0xFFFF` → stopped; `≤ 0x3F` → misread; else
+  `RPM = 1 350 000 / (2 × count)`.
+- **Channels 4–6** count only when enabled in register `0x0C` (bit 4, bit 5, bit 2); disabled
+  channels are never shown. Read once at detection.
+- **Validation**: unit tests on the conversion and the mode bits; on hardware by the Gigabyte
+  B550M's user (quickstart G1–G2). Not checked on the developer's PC (Nuvoton).

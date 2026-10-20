@@ -96,7 +96,7 @@ Fan speeds never turn amber or red: a fan's speed alone does not say whether som
 | GPU usage, temperature, VRAM | Any dedicated GPU (NVIDIA, AMD, Intel Arc) — read from Windows itself, like Task Manager. Integrated graphics are ignored. |
 | CPU temperature | **AMD Ryzen** and **Intel** CPUs, with the [PawnIO](https://pawnio.eu) driver installed and the app running as administrator |
 | GPU fan | A dedicated GPU whose driver reports its fan speed (e.g. NVIDIA) |
-| Motherboard fans | Desktop boards with a **Nuvoton NCT6796D–NCT6799D or NCT6701D** monitoring chip (most current ASUS, MSI and Gigabyte boards), PawnIO installed and the app running as administrator. Laptops are not supported. |
+| Motherboard fans | Desktop boards with a **Nuvoton NCT6796D–NCT6799D / NCT6701D** (most current ASUS and MSI boards) or an **ITE IT8628E / IT8686E / IT8688E** (Gigabyte boards) monitoring chip, PawnIO installed and the app running as administrator. Laptops are not supported. |
 
 When something can't be read, the Panel shows `—` and the reason (`no GPU`, `driver not found`,
 `unsupported CPU`, …) and everything else keeps working.
@@ -129,9 +129,11 @@ Measured on a Ryzen 9 7900 with Windows 11 and about 300 running processes:
   can make Windows unstable or restart it. That is why every End needs a second click.
 - Before ending a process, the app checks it is still the same process it listed, so a recycled
   process ID can never make it close the wrong program.
-- **Fans are read-only.** The app never changes fan speeds, fan curves or any setting of the
-  motherboard's monitoring chip — not even the firmware's read lock. It shares the chip with tools
-  like HWiNFO through the same system-wide lock they use, so they do not disturb each other.
+- **Fans are read-only.** The app never changes fan speeds, fan curves or voltages. The only
+  setting it touches is the read lock some firmware puts on the monitoring chip (ASUS boards),
+  which it clears like HWiNFO and iCUE do; the firmware sets it again at the next boot. It shares
+  the chip with those tools through the same system-wide lock they use, so they do not disturb
+  each other.
 
 ## Troubleshooting
 
@@ -143,9 +145,8 @@ Measured on a Ryzen 9 7900 with Windows 11 and about 300 running processes:
   and restart the app.
 - **`— unsupported CPU`** — CPU temperature is available for AMD Ryzen and Intel CPUs only.
 - **Fans show `— locked by firmware`** — your motherboard's firmware locks its monitoring chip
-  against reads (common on ASUS boards). Tools like HWiNFO unlock it; Computer Stats only reads and
-  never changes a chip setting, so it waits: the fans appear by themselves within a minute if
-  another tool unlocks the chip.
+  against reads (common on ASUS boards). The app clears that lock, like HWiNFO and iCUE do; this
+  message means clearing it failed.
 - **Fans show `— unsupported motherboard`** — the board's monitoring chip is not one the app
   knows yet (see the table above).
 - **GPU fan shows `— not reported`** — the GPU driver has not reported a fan speed yet. Some GPUs
