@@ -1,4 +1,4 @@
-//! Taskbar and monitor geometry for placing the Panel (research R5).
+//! Taskbar and monitor geometry for placing the Panel (research R5), and the screen capture.
 
 use windows::Win32::Foundation::{POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
@@ -7,9 +7,10 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{
-    ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETTASKBARPOS, APPBARDATA, SHAppBarMessage,
+    ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETTASKBARPOS, APPBARDATA, SHAppBarMessage, ShellExecuteW,
 };
-use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, SW_SHOWNORMAL};
+use windows::core::w;
 
 use crate::domain::anchor::{Edge, Rect};
 
@@ -104,4 +105,23 @@ fn to_win(r: Rect) -> RECT {
         right: r.right,
         bottom: r.bottom,
     }
+}
+
+/// Opens the Windows screen capture (Snipping Tool's overlay). Print Screen does not reach it on
+/// its own while the elevated Panel has focus: its keyboard hook runs unelevated. False if it
+/// could not be started.
+pub fn open_screen_capture() -> bool {
+    // SAFETY: constant, NUL-terminated wide strings; no owner window.
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            w!("open"),
+            w!("ms-screenclip:"),
+            None,
+            None,
+            SW_SHOWNORMAL,
+        )
+    };
+    // Values above 32 mean success.
+    result.0 as usize > 32
 }

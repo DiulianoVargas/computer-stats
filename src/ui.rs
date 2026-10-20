@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
 use slint::winit_030::winit::event::WindowEvent;
+use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
 use slint::winit_030::winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
@@ -33,6 +34,10 @@ use crate::startup;
 /// (the taskbar took focus first), so it must not reopen it (research R4).
 const TOGGLE_GUARD: Duration = Duration::from_millis(300);
 
+/// The screen capture opened this recently took the Panel's focus, so the Panel stays shown and
+/// is in the capture. Also ignores the key's second event (press and release).
+const CAPTURE_GUARD: Duration = Duration::from_secs(5);
+
 const MENU_START_WITH_WINDOWS: u32 = 1;
 const MENU_QUIT: u32 = 2;
 const MENU_DESKTOP_WIDGET: u32 = 3;
@@ -57,6 +62,9 @@ struct App {
     icon: (WarningLevel, TrayTheme, u32),
     visible: bool,
     hidden_by_deactivation: Option<Instant>,
+    /// When Print Screen opened the screen capture over the Panel; cleared when the Panel gets
+    /// focus back.
+    capture_opened: Option<Instant>,
     /// Logical height the Panel was last positioned for.
     placed_height: f32,
     /// Start with Windows as last read from or written to Task Scheduler (FR-005).
@@ -193,16 +201,32 @@ pub fn run() -> Result<(), String> {
         update_app(move |app| app.processes.cancel_arming());
     });
     // Click outside: the Panel loses focus (FR-008). Handled after winit's dispatch returns.
+    // Print Screen opens the screen capture, which then takes the focus without hiding the Panel.
     panel.window().on_winit_window_event(|_, event| {
-        if let WindowEvent::Focused(false) = event {
-            let _ = slint::invoke_from_event_loop(|| {
-                update_app(move |app| {
-                    if app.visible {
-                        app.hide();
-                        app.hidden_by_deactivation = Some(Instant::now());
-                    }
+        match event {
+            WindowEvent::Focused(false) => {
+                let _ = slint::invoke_from_event_loop(|| {
+                    update_app(move |app| {
+                        if app.visible && !app.capturing() {
+                            app.hide();
+                            app.hidden_by_deactivation = Some(Instant::now());
+                        }
+                    });
                 });
-            });
+            }
+            WindowEvent::Focused(true) => {
+                let _ = slint::invoke_from_event_loop(|| {
+                    update_app(move |app| app.capture_opened = None);
+                });
+            }
+            WindowEvent::KeyboardInput { event, .. }
+                if event.physical_key == PhysicalKey::Code(KeyCode::PrintScreen) =>
+            {
+                let _ = slint::invoke_from_event_loop(|| {
+                    update_app(move |app| app.open_screen_capture());
+                });
+            }
+            _ => {}
         }
         EventResult::Propagate
     });
@@ -223,6 +247,7 @@ pub fn run() -> Result<(), String> {
             icon,
             visible: false,
             hidden_by_deactivation: None,
+            capture_opened: None,
             placed_height: 0.0,
             start_with_windows: startup::is_enabled(),
             sampler,
@@ -454,6 +479,21 @@ impl App {
                 .set_icon(&tray_art::render(wanted.2, wanted.1, wanted.0), wanted.2);
             self.icon = wanted;
         }
+    }
+
+    /// Opens the screen capture once per key press (FR-008 exception: the Panel stays shown).
+    fn open_screen_capture(&mut self) {
+        if !self.visible || self.capturing() {
+            return;
+        }
+        if shell::open_screen_capture() {
+            self.capture_opened = Some(Instant::now());
+        }
+    }
+
+    fn capturing(&self) -> bool {
+        self.capture_opened
+            .is_some_and(|at| at.elapsed() < CAPTURE_GUARD)
     }
 
     fn hide(&mut self) {
