@@ -139,4 +139,6 @@ hold everything that can be tested without Windows; `src/platform/` is the only 
 
 ## Complexity Tracking
 
-No violations.
+| Item | Status |
+|------|--------|
+| NVML costs ≈ 19.5 MB private memory (T028, measurements.md); with PawnIO (≈ 7 MB) the Panel-closed total is ≈ 29 MB of the 30 MB budget (Constitution I) | **Open, needs a decision.** Candidate: read GPU Usage, VRAM and GPU Temperature from the Windows kernel graphics interface (`D3DKMTQueryStatistics` / `D3DKMTQueryAdapterInfo` adapter perf data, what Task Manager uses) instead of NVML, which would need a constitution amendment (Technical Constraints name NVML) |

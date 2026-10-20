@@ -5,24 +5,86 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use crate::domain::metric::Reason;
-use crate::snapshot::Snapshot;
+use crate::domain::metric::{MetricKind, Reading, Reason};
+use crate::platform::cpu::CpuTimes;
+use crate::platform::nvml::{GpuReadings, GpuSource};
+use crate::platform::pawnio::CpuTemperatureSource;
+use crate::platform::{drives, memory};
+use crate::snapshot::{APP_NAME, DriveState, MetricState, Snapshot};
 
 const TICK: Duration = Duration::from_secs(1);
 const JOIN_LIMIT: Duration = Duration::from_secs(2);
+/// How often the Drive list is re-enumerated (FR-022: within 5 s of a change).
+const DRIVE_ENUMERATION: Duration = Duration::from_secs(5);
 
 /// All per-tick state and Metric sources. Created on the sampler thread, so sources that are not
-/// `Send` (raw driver handles) never cross threads.
-struct Sampler {}
+/// `Send` (raw driver handles) never cross threads. A source that failed to open yields its
+/// `Reason` every tick; each source fails independently (Constitution VIII).
+struct Sampler {
+    cpu: CpuTimes,
+    cpu_temperature: Result<CpuTemperatureSource, Reason>,
+    gpu: Result<GpuSource, Reason>,
+    drive_letters: Vec<char>,
+    drives_enumerated: Option<Instant>,
+}
 
 impl Sampler {
     fn new() -> Sampler {
-        Sampler {}
+        Sampler {
+            cpu: CpuTimes::new(),
+            cpu_temperature: CpuTemperatureSource::open(),
+            gpu: GpuSource::open(),
+            drive_letters: Vec::new(),
+            drives_enumerated: None,
+        }
     }
 
     /// One tick. Must never panic (Constitution VIII).
     fn tick(&mut self) -> Snapshot {
-        Snapshot::unavailable(Reason::ReadFailed)
+        let gpu = match &self.gpu {
+            Ok(source) => source.read(),
+            Err(reason) => GpuReadings::unavailable(*reason),
+        };
+        let cpu_temperature = match &self.cpu_temperature {
+            Ok(source) => source.read(),
+            Err(reason) => Reading::Unavailable(*reason),
+        };
+        let readings = [
+            self.cpu.sample(),
+            cpu_temperature,
+            gpu.usage,
+            gpu.temperature,
+            gpu.vram,
+            memory::memory_usage(),
+        ];
+        let metrics = MetricKind::ALL.map(|kind| MetricState {
+            kind,
+            reading: readings[kind.index()],
+        });
+
+        Snapshot {
+            metrics,
+            drives: self.read_drives(),
+            tooltip: APP_NAME.to_string(),
+        }
+    }
+
+    /// Free space of known Drives every tick; the list itself every `DRIVE_ENUMERATION`.
+    fn read_drives(&mut self) -> Vec<DriveState> {
+        let due = self
+            .drives_enumerated
+            .is_none_or(|at| at.elapsed() >= DRIVE_ENUMERATION);
+        if due {
+            self.drive_letters = drives::enumerate();
+            self.drives_enumerated = Some(Instant::now());
+        }
+        self.drive_letters
+            .iter()
+            .map(|&letter| match drives::read(letter) {
+                Ok(drive) => DriveState::Ready(drive),
+                Err(reason) => DriveState::Unavailable { letter, reason },
+            })
+            .collect()
     }
 }
 

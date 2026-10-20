@@ -16,8 +16,9 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-# UI toolkit (ADR-0001). Software renderer only (Constitution V); raw-window-handle exposes the Panel HWND.
-slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "raw-window-handle-06"] }
+# UI toolkit (ADR-0001). Software renderer only (Constitution V). `unstable-winit-030` (no extra
+# crates) gives the Panel's winit attributes and focus events (research R4).
+slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "unstable-winit-030"] }
 # Win32 FFI for the Tray Icon, Panel window tweaks and Metric sources (Constitution III: used only in src/platform/).
 windows = { version = "0.62", default-features = false, features = [
     "Win32_Foundation",
@@ -37,8 +38,6 @@ windows = { version = "0.62", default-features = false, features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
-# Reads the Panel's native HWND from Slint's window (research R4).
-raw-window-handle = "0.6"
 
 [build-dependencies]
 # Compiles ui/*.slint into Rust at build time.

@@ -1,5 +1,6 @@
 //! The immutable result of one sampler tick, handed to the UI thread (data-model.md).
 
+use crate::domain::drive::Drive;
 use crate::domain::metric::{MetricKind, Reading, Reason};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,10 +9,10 @@ pub struct MetricState {
     pub reading: Reading,
 }
 
-/// One Drive's Disk Space, or why it could not be read. Completed in US1 (T020).
-#[allow(dead_code)] // constructed once Drives are sampled (T027)
+/// One Drive's Disk Space, or why it could not be read.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DriveState {
+    Ready(Drive),
     Unavailable { letter: char, reason: Reason },
 }
 

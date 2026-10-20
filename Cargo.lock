@@ -593,7 +593,6 @@ dependencies = [
 name = "computer-stats"
 version = "0.1.0"
 dependencies = [
- "raw-window-handle",
  "slint",
  "slint-build",
  "windows",
@@ -3687,6 +3686,7 @@ dependencies = [
  "const-field-offset",
  "i-slint-backend-linuxkms",
  "i-slint-backend-selector",
+ "i-slint-backend-winit",
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",
@@ -3694,7 +3694,6 @@ dependencies = [
  "num-traits",
  "once_cell",
  "pin-weak",
- "raw-window-handle",
  "slint-macros",
  "unicode-segmentation",
  "vtable",

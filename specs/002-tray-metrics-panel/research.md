@@ -59,6 +59,13 @@
   - apply rounded corners with `DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)`;
   - subclass the window (`SetWindowSubclass`) to catch `WM_ACTIVATE` with `WA_INACTIVE` → hide
     (click outside, FR-008).
+- **Amended during implementation (2026-10-20)**: the HWND tweaks above are done through Slint's
+  `unstable-winit-030` feature instead of Win32 calls: the winit attributes hook sets the hidden
+  tray window as the Panel's **owner** (owned windows get no taskbar button and are not in Alt+Tab),
+  `with_skip_taskbar(true)` and `with_corner_preference(Round)`; `on_winit_window_event` delivers
+  `Focused(false)` for click-outside. No subclassing, no `platform/window.rs`, no
+  `raw-window-handle` crate. The Panel is re-positioned when its height changes, because the Drive
+  rows only count toward the height once the window exists.
 - **Opening**: on `NIN_SELECT`, push the latest Snapshot into the Panel's properties, position it,
   `show()`, then `SetForegroundWindow` (allowed: the tray click grants foreground rights).
 - **Toggle race**: clicking the Tray Icon while the Panel is open first deactivates the Panel

@@ -15,6 +15,8 @@ param(
     [double]$Minutes = 10,
     [switch]$PanelOpen,
     [string]$ProcessName = 'computer-stats',
+    # Measure this process instead of the first one named $ProcessName.
+    [int]$ProcessId = 0,
     [string]$Exe = (Join-Path $PSScriptRoot '..\target\release\computer-stats.exe')
 )
 
@@ -25,7 +27,11 @@ $maxCpu = if ($PanelOpen) { 2.0 } else { 0.5 }
 $label = if ($PanelOpen) { 'Panel open' } else { 'Panel closed' }
 $cores = [Environment]::ProcessorCount
 
-$proc = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue | Select-Object -First 1
+$proc = if ($ProcessId) {
+    Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+} else {
+    Get-Process -Name $ProcessName -ErrorAction SilentlyContinue | Select-Object -First 1
+}
 if (-not $proc) {
     Write-Error "Process '$ProcessName' is not running."
     exit 2

@@ -18,12 +18,15 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi};
 use windows::Win32::UI::Shell::{
     NIF_GUID, NIF_ICON, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
-    NIM_SETVERSION, NIN_SELECT, NINF_KEY, NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
+    NIM_SETVERSION, NIN_SELECT, NINF_KEY, NOTIFYICON_VERSION_4, NOTIFYICONDATAW,
+    NOTIFYICONIDENTIFIER, Shell_NotifyIconGetRect, Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    ChangeWindowMessageFilterEx, CreateIconIndirect, CreateWindowExW, DefWindowProcW, DestroyIcon,
-    DestroyWindow, HICON, ICONINFO, MSGFLT_ALLOW, RegisterClassW, RegisterWindowMessageW,
-    SM_CXSMICON, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WNDCLASSW, WS_OVERLAPPED,
+    AppendMenuW, ChangeWindowMessageFilterEx, CreateIconIndirect, CreatePopupMenu, CreateWindowExW,
+    DefWindowProcW, DestroyIcon, DestroyMenu, DestroyWindow, HICON, ICONINFO, MF_CHECKED,
+    MF_SEPARATOR, MF_STRING, MSGFLT_ALLOW, PostMessageW, RegisterClassW, RegisterWindowMessageW,
+    SM_CXSMICON, SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    TrackPopupMenuEx, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_NULL, WNDCLASSW, WS_OVERLAPPED,
 };
 use windows::core::{GUID, PCWSTR, w};
 
@@ -40,6 +43,18 @@ pub const WINDOW_CLASS: PCWSTR = w!("ComputerStats.Tray");
 const CALLBACK_MESSAGE: u32 = WM_APP + 1;
 /// `NIN_KEYSELECT` (not exported by the `windows` crate).
 const NIN_KEYSELECT: u32 = NIN_SELECT | NINF_KEY;
+
+/// One Tray Menu entry.
+pub enum MenuEntry {
+    Item {
+        id: u32,
+        text: &'static str,
+        /// `Some` makes the item checkable.
+        checked: Option<bool>,
+    },
+    #[allow(dead_code)] // used once Start with Windows joins the menu (T053)
+    Separator,
+}
 
 type Handler = Box<dyn Fn(TrayEvent)>;
 
@@ -133,6 +148,67 @@ impl TrayIcon {
         // SAFETY: `hwnd` is our live window.
         let size = unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForWindow(hwnd)) };
         if size > 0 { size as u32 } else { 16 }
+    }
+
+    /// The hidden window's handle, used as the Panel's owner (keeps it out of the taskbar and
+    /// Alt+Tab).
+    pub fn hwnd(&self) -> isize {
+        STATE.with_borrow(|s| s.as_ref().map_or(0, |s| s.hwnd.0 as isize))
+    }
+
+    /// The icon's screen rectangle in physical pixels; `None` when it is in the overflow flyout or
+    /// the shell cannot tell.
+    pub fn rect(&self) -> Option<crate::domain::anchor::Rect> {
+        let id = STATE.with_borrow(|s| {
+            s.as_ref().map(|s| NOTIFYICONIDENTIFIER {
+                cbSize: size_of::<NOTIFYICONIDENTIFIER>() as u32,
+                hWnd: s.hwnd,
+                guidItem: s.guid,
+                ..Default::default()
+            })
+        })?;
+        // SAFETY: `id` identifies our icon.
+        let r = unsafe { Shell_NotifyIconGetRect(&id) }.ok()?;
+        (r.right > r.left).then(|| super::shell::from_win(r))
+    }
+
+    /// Shows the Tray Menu at (`x`, `y`) and returns the chosen item's id. Blocks in the menu's
+    /// modal loop until it closes.
+    pub fn show_menu(&self, x: i32, y: i32, entries: &[MenuEntry]) -> Option<u32> {
+        let hwnd = STATE.with_borrow(|s| s.as_ref().map(|s| s.hwnd))?;
+        // SAFETY: the menu is created, used and destroyed here; strings outlive the calls.
+        unsafe {
+            let menu = CreatePopupMenu().ok()?;
+            for entry in entries {
+                match entry {
+                    MenuEntry::Item { id, text, checked } => {
+                        let text: Vec<u16> = text.encode_utf16().chain([0]).collect();
+                        let flags = if *checked == Some(true) {
+                            MF_STRING | MF_CHECKED
+                        } else {
+                            MF_STRING
+                        };
+                        let _ = AppendMenuW(menu, flags, *id as usize, PCWSTR(text.as_ptr()));
+                    }
+                    MenuEntry::Separator => {
+                        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+                    }
+                }
+            }
+            // Without foreground, the menu would not close when clicking elsewhere.
+            let _ = SetForegroundWindow(hwnd);
+            let chosen = TrackPopupMenuEx(
+                menu,
+                (TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY).0,
+                x,
+                y,
+                hwnd,
+                None,
+            );
+            let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
+            let _ = DestroyMenu(menu);
+            (chosen.0 != 0).then_some(chosen.0 as u32)
+        }
     }
 
     /// Replaces the icon image with premultiplied ARGB `pixels` (`size × size`, top row first).

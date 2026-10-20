@@ -1,5 +1,10 @@
 // The Panel (contracts/ui.md): stacked sections, read-only, Esc closes it.
+import { ScrollView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
+import { MetricRow, MetricRowData } from "metric-row.slint";
+import { DriveRow, DriveRowData } from "drive-row.slint";
+
+export { MetricRowData, DriveRowData }
 
 component SectionHeader inherits Text {
     color: Theme.section-text;
@@ -8,17 +13,32 @@ component SectionHeader inherits Text {
 }
 
 export component PanelWindow inherits Window {
+    in property <MetricRowData> cpu-usage;
+    in property <MetricRowData> cpu-temperature;
+    in property <MetricRowData> gpu-usage;
+    in property <MetricRowData> gpu-temperature;
+    in property <MetricRowData> vram;
+    in property <MetricRowData> memory-usage;
+    in property <[DriveRowData]> drives;
+
+    // Esc pressed; the app hides the Panel.
+    callback close-requested();
+
+    // Logical height the Panel needs, so the app can position it before showing it.
+    out property <length> panel-height: min(content.preferred-height, 640px);
+
+    // Drives beyond this many scroll (spec edge case "Many Drives").
+    property <int> visible-drives: min(drives.length, 6);
+    property <length> drive-row-height: 36px;
+
     title: "Computer Stats";
     no-frame: true;
     always-on-top: true;
     width: 340px;
-    max-height: 640px;
+    height: panel-height;
     background: Theme.background;
     default-font-size: Theme.font-size;
     forward-focus: keys;
-
-    // Esc pressed; the app hides the Panel.
-    callback close-requested();
 
     keys := FocusScope {
         key-pressed(event) => {
@@ -33,28 +53,46 @@ export component PanelWindow inherits Window {
             border-width: 1px;
             border-color: Theme.border;
 
-            VerticalLayout {
+            content := VerticalLayout {
                 padding: Theme.padding;
                 spacing: Theme.section-gap;
 
                 VerticalLayout {
                     spacing: Theme.row-gap;
                     SectionHeader { text: "CPU"; }
+                    MetricRow { data: root.cpu-usage; }
+                    MetricRow { data: root.cpu-temperature; }
                 }
 
                 VerticalLayout {
                     spacing: Theme.row-gap;
                     SectionHeader { text: "GPU"; }
+                    MetricRow { data: root.gpu-usage; }
+                    MetricRow { data: root.gpu-temperature; }
+                    MetricRow { data: root.vram; }
                 }
 
                 VerticalLayout {
                     spacing: Theme.row-gap;
                     SectionHeader { text: "Memory"; }
+                    MetricRow { data: root.memory-usage; }
                 }
 
                 VerticalLayout {
                     spacing: Theme.row-gap;
                     SectionHeader { text: "Drives"; }
+                    if root.drives.length <= 6: VerticalLayout {
+                        spacing: Theme.row-gap;
+                        for drive in root.drives: DriveRow { data: drive; }
+                    }
+                    if root.drives.length > 6: ScrollView {
+                        height: root.visible-drives * (root.drive-row-height + Theme.row-gap);
+                        VerticalLayout {
+                            spacing: Theme.row-gap;
+                            padding-right: 12px;
+                            for drive in root.drives: DriveRow { data: drive; }
+                        }
+                    }
                 }
 
                 // App Volumes section: added below the Metrics by a later feature (FR-010).
