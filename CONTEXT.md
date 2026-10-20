@@ -15,7 +15,7 @@ The visualizer's icon in the Windows system tray (next to the clock). It is the 
 _Avoid_: Taskbar icon, task manager icon
 
 **Tray Menu**:
-The small right-click menu on the Tray Icon holding app-level options (Start with Windows, Quit). Never shows Metrics.
+The small right-click menu on the Tray Icon holding app-level options (Start with Windows, Show desktop widget, Quit). Never shows Metrics.
 _Avoid_: Context menu, settings
 
 **Start with Windows**:
@@ -29,6 +29,10 @@ _Avoid_: Badge, indicator
 **Panel**:
 The popup that opens anchored above the Tray Icon on left-click and closes when the user clicks anywhere else. It has two Views, switched with tabs at its top: the Metrics View and the Processes View.
 _Avoid_: Widget, window, dashboard, menu, flyout
+
+**Desktop Widget**:
+The optional, observe-only card the user places on the desktop, showing Metrics with their Sparklines. Turned on and off from the Tray Menu, stays behind all other windows and remembers its position. Not part of the Panel.
+_Avoid_: Gadget, overlay, Panel (for this term)
 
 **Metrics View**:
 The Panel's default View: all Metrics and App Volumes.

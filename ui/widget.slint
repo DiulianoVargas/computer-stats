@@ -1,0 +1,135 @@
+// The Desktop Widget (005 contracts/ui.md): five Metrics on a semi-transparent card. Never shown as a window: the app renders it with `take_snapshot()` and presents the
+// image on a layered window (research R1).
+import { MetricRowData } from "metric-row.slint";
+
+// Colors for the active Windows mode (research R7). Set from `WidgetWindow.dark`.
+global WidgetTheme {
+    in-out property <bool> dark: true;
+
+    out property <color> text: dark ? #ffffff : #1b1b1b;
+    out property <color> muted-text: dark ? #c8c8c8 : #424242;
+    // The Panel's background and border at 75 %, so the wallpaper shows through but any
+    // wallpaper stays readable.
+    out property <color> card: dark ? #202020bf : #f9f9f9bf;
+    out property <color> card-border: dark ? #3a3a3abf : #e0e0e0bf;
+    // The Panel's Warning Level colors for the same mode (theme.slint).
+    out property <color> warning: dark ? #f5a623 : #b26b00;
+    out property <color> critical: dark ? #e5484d : #c62828;
+
+    public pure function level-text(level: int) -> color {
+        level == 2 ? critical : level == 1 ? warning : text
+    }
+}
+
+component WidgetText inherits Text {
+    color: WidgetTheme.text;
+    font-size: 13px;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+// One Metric, laid out like the Panel's MetricRow (metric-row.slint).
+component WidgetMetricRow inherits HorizontalLayout {
+    in property <MetricRowData> data;
+
+    spacing: 8px;
+    height: 20px;
+
+    WidgetText {
+        text: data.label;
+        min-width: 80px;
+    }
+    WidgetText {
+        text: data.value-text;
+        color: data.unavailable ? WidgetTheme.muted-text : WidgetTheme.level-text(data.level);
+        horizontal-alignment: right;
+        horizontal-stretch: 1;
+    }
+    WidgetText {
+        text: data.secondary-text;
+        color: WidgetTheme.level-text(data.level);
+        horizontal-alignment: right;
+        width: 36px;
+    }
+    Rectangle {
+        width: 60px;
+        height: 20px;
+
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 60;
+            viewbox-height: 20;
+            commands: data.sparkline;
+            stroke: WidgetTheme.level-text(data.level);
+            stroke-width: 1.5px;
+            fill: transparent;
+        }
+    }
+}
+
+component SectionHeader inherits WidgetText {
+    color: WidgetTheme.muted-text;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+export component WidgetWindow inherits Window {
+    in property <MetricRowData> cpu-usage;
+    in property <MetricRowData> cpu-temperature;
+    in property <MetricRowData> gpu-usage;
+    in property <MetricRowData> gpu-temperature;
+    in property <MetricRowData> memory-usage;
+    in property <bool> dark: true;
+
+    // Logical height the content needs; the app sizes the layered window from it.
+    out property <length> widget-height: content.preferred-height;
+
+    init => {
+        WidgetTheme.dark = root.dark;
+    }
+    changed dark => {
+        WidgetTheme.dark = root.dark;
+    }
+
+    title: "Computer Stats widget";
+    no-frame: true;
+    width: 320px;
+    height: widget-height;
+    // Alpha 1/255 in the rounded corners: invisible, but every pixel receives the mouse for
+    // dragging (research R2).
+    background: #00000001;
+    default-font-size: 13px;
+
+    Rectangle {
+        background: WidgetTheme.card;
+        border-color: WidgetTheme.card-border;
+        border-width: 1px;
+        border-radius: 8px;
+    }
+
+    content := VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+
+        VerticalLayout {
+            spacing: 2px;
+            SectionHeader { text: "CPU"; }
+            WidgetMetricRow { data: root.cpu-usage; }
+            WidgetMetricRow { data: root.cpu-temperature; }
+        }
+
+        VerticalLayout {
+            spacing: 2px;
+            SectionHeader { text: "GPU"; }
+            WidgetMetricRow { data: root.gpu-usage; }
+            WidgetMetricRow { data: root.gpu-temperature; }
+        }
+
+        VerticalLayout {
+            spacing: 2px;
+            SectionHeader { text: "Memory"; }
+            WidgetMetricRow { data: root.memory-usage; }
+        }
+    }
+}

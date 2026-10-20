@@ -15,3 +15,4 @@ pub mod status_dot;
 pub mod task_xml;
 pub mod tray_art;
 pub mod warning;
+pub mod widget_place;

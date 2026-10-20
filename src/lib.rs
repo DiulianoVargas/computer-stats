@@ -3,6 +3,7 @@
 #![deny(unsafe_code)]
 
 mod crash_log;
+mod desktop_widget;
 pub mod domain;
 #[allow(unsafe_code)]
 mod platform;

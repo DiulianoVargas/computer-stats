@@ -69,6 +69,10 @@ Source: "{#PackageDir}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignorevers
 Name: "{autoprograms}\Computer Stats"; Filename: "{app}\computer-stats.exe"
 Name: "{autodesktop}\Computer Stats"; Filename: "{app}\computer-stats.exe"; Tasks: desktopicon
 
+[Registry]
+; The Desktop Widget's on/off and position (005 research R5): removed on uninstall, never created here.
+Root: HKCU; Subkey: "Software\Computer Stats"; Flags: uninsdeletekey dontcreatekey
+
 [Run]
 ; shellexec: postinstall entries run as the original, non-elevated user, and CreateProcess cannot
 ; start an exe whose manifest asks for elevation (error 740). ShellExecute shows the UAC prompt,
