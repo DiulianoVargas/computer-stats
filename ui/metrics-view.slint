@@ -1,4 +1,4 @@
-// The Metrics View (feature 002, unchanged): stacked Metric sections and Drives.
+// The Metrics View (feature 002): stacked Metric sections, Fans (006) and Drives.
 import { ScrollView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import { MetricRow, MetricRowData } from "metric-row.slint";
@@ -17,8 +17,13 @@ export component MetricsView inherits VerticalLayout {
     in property <MetricRowData> cpu-temperature;
     in property <MetricRowData> gpu-usage;
     in property <MetricRowData> gpu-temperature;
+    in property <MetricRowData> gpu-fan;
     in property <MetricRowData> vram;
     in property <MetricRowData> memory-usage;
+    // Motherboard Fans (006): one row per Fan, or "— reason" when they cannot be read. Both empty
+    // (no Fan has spun yet) hides the section.
+    in property <[MetricRowData]> fans;
+    in property <string> fans-reason;
     in property <[DriveRowData]> drives;
 
     // Drives beyond this many scroll (spec edge case "Many Drives").
@@ -39,6 +44,7 @@ export component MetricsView inherits VerticalLayout {
         SectionHeader { text: "GPU"; }
         MetricRow { data: root.gpu-usage; }
         MetricRow { data: root.gpu-temperature; }
+        MetricRow { data: root.gpu-fan; }
         MetricRow { data: root.vram; }
     }
 
@@ -46,6 +52,19 @@ export component MetricsView inherits VerticalLayout {
         spacing: Theme.row-gap;
         SectionHeader { text: "Memory"; }
         MetricRow { data: root.memory-usage; }
+    }
+
+    if root.fans.length > 0 || root.fans-reason != "": VerticalLayout {
+        spacing: Theme.row-gap;
+        SectionHeader { text: "Fans"; }
+        for fan in root.fans: MetricRow { data: fan; }
+        if root.fans-reason != "": Text {
+            text: root.fans-reason;
+            color: Theme.muted-text;
+            height: 20px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
     }
 
     VerticalLayout {

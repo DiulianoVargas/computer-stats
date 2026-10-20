@@ -1,6 +1,7 @@
 //! The immutable result of one sampler tick, handed to the UI thread (data-model.md).
 
 use crate::domain::drive::Drive;
+use crate::domain::fan::ShownFan;
 use crate::domain::history::History;
 use crate::domain::metric::{MetricKind, Reading, Reason};
 use crate::domain::status_dot::StatusDot;
@@ -24,10 +25,19 @@ pub enum DriveState {
     Unavailable { letter: char, reason: Reason },
 }
 
+/// The motherboard Fans (006): the shown Fans, or why none can be read.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FansState {
+    /// In channel order; empty until a Fan has spun.
+    Fans(Vec<ShownFan>),
+    Unavailable(Reason),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
     /// In Panel order (`MetricKind::ALL`).
-    pub metrics: [MetricState; 6],
+    pub metrics: [MetricState; MetricKind::ALL.len()],
+    pub fans: FansState,
     /// Sorted by Drive letter.
     pub drives: Vec<DriveState>,
     pub status_dot: StatusDot,
@@ -48,6 +58,7 @@ impl Snapshot {
                 level: None,
                 history: History::default(),
             }),
+            fans: FansState::Unavailable(reason),
             drives: Vec::new(),
             status_dot: StatusDot {
                 level: WarningLevel::Normal,

@@ -1,5 +1,6 @@
 //! CPU Temperature through PawnIO: the `AMDFamily17.bin` module on AMD (spike 001, verdict
 //! Confirmed) or `IntelMSR.bin` on Intel (feature 004). Opened once for the app's lifetime.
+//! `PawnIo` is shared with the motherboard Fan source (`superio.rs`, feature 006).
 
 use std::ffi::{OsStr, c_char, c_void};
 use std::os::windows::ffi::OsStrExt;
@@ -157,7 +158,7 @@ type ExecuteFn = unsafe extern "system" fn(
 type CloseFn = unsafe extern "system" fn(*mut c_void) -> Hresult;
 
 /// An open PawnIO handle with a loaded module. Closed on drop.
-struct PawnIo {
+pub(super) struct PawnIo {
     lib: HMODULE,
     handle: *mut c_void,
     execute: ExecuteFn,
@@ -166,7 +167,7 @@ struct PawnIo {
 
 impl PawnIo {
     /// Loads PawnIOLib.dll from the PawnIO install location and loads `module_path` into it.
-    fn open(module_path: &Path) -> Result<PawnIo, Reason> {
+    pub(super) fn open(module_path: &Path) -> Result<PawnIo, Reason> {
         // A missing module file is split from a missing driver (spike verdict).
         let blob = std::fs::read(module_path).map_err(|_| Reason::ModuleNotFound)?;
         let dll = to_wide(install_dir().join("PawnIOLib.dll").as_os_str());
@@ -222,11 +223,14 @@ impl PawnIo {
         })
     }
 
-    /// Calls a module function that takes one input cell and returns one output cell (the AMD
-    /// module's `ioctl_read_smn`, the Intel module's `ioctl_read_msr`).
-    fn execute(&self, function: &std::ffi::CStr, input: u64) -> Result<u64, Reason> {
-        let input = [input];
-        let mut output = [0u64; 1];
+    /// Calls a module function with `input` cells, filling all of `output`; fails if the module
+    /// returns an error or fewer cells than `output` holds.
+    pub(super) fn call(
+        &self,
+        function: &std::ffi::CStr,
+        input: &[u64],
+        output: &mut [u64],
+    ) -> Result<(), Reason> {
         let mut returned = 0usize;
         // SAFETY: buffers are valid for the lengths passed; the function name is NUL-terminated.
         let hr = unsafe {
@@ -240,9 +244,17 @@ impl PawnIo {
                 &mut returned,
             )
         };
-        if hr < 0 || returned != 1 {
+        if hr < 0 || returned != output.len() {
             return Err(Reason::ReadFailed);
         }
+        Ok(())
+    }
+
+    /// Calls a module function that takes one input cell and returns one output cell (the AMD
+    /// module's `ioctl_read_smn`, the Intel module's `ioctl_read_msr`).
+    fn execute(&self, function: &std::ffi::CStr, input: u64) -> Result<u64, Reason> {
+        let mut output = [0u64; 1];
+        self.call(function, &[input], &mut output)?;
         Ok(output[0])
     }
 

@@ -56,7 +56,8 @@ pub const HYSTERESIS: f32 = 2.0;
 /// FR-014. CPU Usage and GPU Usage are always Normal.
 pub fn thresholds(kind: MetricKind) -> Option<Thresholds> {
     let (warning, critical) = match kind {
-        MetricKind::CpuUsage | MetricKind::GpuUsage => return None,
+        // Fan Speeds are always Normal (006 FR-007).
+        MetricKind::CpuUsage | MetricKind::GpuUsage | MetricKind::GpuFan => return None,
         MetricKind::MemoryUsage => (80.0, 90.0),
         MetricKind::Vram => (85.0, 95.0),
         MetricKind::CpuTemperature => (80.0, 90.0),

@@ -15,6 +15,11 @@ pub fn temperature(v: f32) -> String {
     format!("{} °C", v.round() as i32)
 }
 
+/// `"1240 RPM"`: no thousands separator (006 contracts/ui.md).
+pub fn rpm(v: f32) -> String {
+    format!("{} RPM", v.round() as i32)
+}
+
 /// `"18.4 / 31.9 GB"`
 pub fn used_total(used: u64, total: u64) -> String {
     format!("{:.1} / {:.1} GB", used as f64 / GB, total as f64 / GB)
@@ -87,6 +92,12 @@ mod tests {
     fn temperature_rounds_to_integer() {
         assert_eq!(temperature(54.26), "54 °C");
         assert_eq!(temperature(89.5), "90 °C");
+    }
+
+    #[test]
+    fn rpm_is_rounded_without_separator() {
+        assert_eq!(rpm(1239.6), "1240 RPM");
+        assert_eq!(rpm(0.0), "0 RPM");
     }
 
     #[test]

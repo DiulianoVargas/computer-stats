@@ -9,10 +9,15 @@ use super::metric::MetricKind;
 pub const WIDTH: f32 = CAPACITY as f32;
 pub const HEIGHT: f32 = 20.0;
 
-/// The vertical scale: 0–100 for percentages, 20–100 °C for temperatures.
+/// The vertical scale for Fan Speeds, motherboard Fans included (006 contracts/ui.md).
+pub const FAN_SCALE: (f32, f32) = (0.0, 3000.0);
+
+/// The vertical scale: 0–100 for percentages, 20–100 °C for temperatures, 0–3000 RPM for Fans.
 pub fn scale(kind: MetricKind) -> (f32, f32) {
     if kind.is_temperature() {
         (20.0, 100.0)
+    } else if kind.is_fan() {
+        FAN_SCALE
     } else {
         (0.0, 100.0)
     }
@@ -102,6 +107,14 @@ mod tests {
         let (min, max) = scale(MetricKind::CpuTemperature);
         let p = path(&history(&[Some(10.0), Some(120.0)]), min, max);
         assert_eq!(p, "M 58.5 20 L 59.5 0");
+    }
+
+    #[test]
+    fn fans_use_a_fixed_rpm_scale() {
+        assert_eq!(scale(MetricKind::GpuFan), (0.0, 3000.0));
+        let (min, max) = scale(MetricKind::GpuFan);
+        let p = path(&history(&[Some(1500.0), Some(4000.0)]), min, max);
+        assert_eq!(p, "M 58.5 10 L 59.5 0");
     }
 
     #[test]

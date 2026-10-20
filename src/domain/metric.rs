@@ -1,23 +1,26 @@
 //! Metrics, their readings and why a reading can be unavailable (data-model.md).
 
-/// The six per-PC Metrics shown with a Sparkline. Disk Space is per Drive (`drive.rs`).
+/// The seven per-PC Metrics shown with a Sparkline. Disk Space is per Drive (`drive.rs`);
+/// motherboard Fans are per header (`fan.rs`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MetricKind {
     CpuUsage,
     CpuTemperature,
     GpuUsage,
     GpuTemperature,
+    GpuFan,
     Vram,
     MemoryUsage,
 }
 
 impl MetricKind {
     /// Every Metric, in Panel order (FR-009).
-    pub const ALL: [MetricKind; 6] = [
+    pub const ALL: [MetricKind; 7] = [
         MetricKind::CpuUsage,
         MetricKind::CpuTemperature,
         MetricKind::GpuUsage,
         MetricKind::GpuTemperature,
+        MetricKind::GpuFan,
         MetricKind::Vram,
         MetricKind::MemoryUsage,
     ];
@@ -28,6 +31,7 @@ impl MetricKind {
             MetricKind::CpuTemperature => "CPU Temperature",
             MetricKind::GpuUsage => "GPU Usage",
             MetricKind::GpuTemperature => "GPU Temperature",
+            MetricKind::GpuFan => "GPU Fan",
             MetricKind::Vram => "VRAM",
             MetricKind::MemoryUsage => "Memory Usage",
         }
@@ -38,6 +42,11 @@ impl MetricKind {
             self,
             MetricKind::CpuTemperature | MetricKind::GpuTemperature
         )
+    }
+
+    /// A Fan Speed in RPM (006): always Normal, never clamped to a percentage.
+    pub fn is_fan(self) -> bool {
+        self == MetricKind::GpuFan
     }
 
     /// Position in `ALL`.
@@ -55,6 +64,12 @@ pub enum Reason {
     ModuleNotFound,
     NoGpu,
     ReadFailed,
+    /// The GPU driver has not reported a Fan Speed (006 research R1).
+    NotReported,
+    /// The motherboard's monitoring chip is not one the app knows (006 research R3).
+    UnsupportedMotherboard,
+    /// The firmware locked the monitoring chip against reads; the app never unlocks it (006 R4).
+    LockedByFirmware,
 }
 
 impl Reason {
@@ -66,6 +81,9 @@ impl Reason {
             Reason::ModuleNotFound => "module not found",
             Reason::NoGpu => "no GPU",
             Reason::ReadFailed => "read failed",
+            Reason::NotReported => "not reported",
+            Reason::UnsupportedMotherboard => "unsupported motherboard",
+            Reason::LockedByFirmware => "locked by firmware",
         }
     }
 }
@@ -84,6 +102,8 @@ pub enum Reading {
 
 const MIN_TEMPERATURE: f32 = 0.0;
 const MAX_TEMPERATURE: f32 = 115.0;
+/// Above this a Fan Speed is a misread (006 data-model).
+pub const MAX_FAN_RPM: f32 = 10_000.0;
 
 impl Reading {
     /// A plain value (no byte counts), validated for `kind`.
@@ -91,8 +111,8 @@ impl Reading {
         Reading::validated(kind, value, None, None)
     }
 
-    /// Percentages are clamped to 0–100; temperatures outside 0–115 °C (or NaN) become
-    /// `Unavailable(ReadFailed)` (rule from spike 001).
+    /// Percentages are clamped to 0–100; temperatures outside 0–115 °C and Fan Speeds outside
+    /// 0–10 000 RPM (or NaN) become `Unavailable(ReadFailed)` (rule from spike 001).
     pub fn validated(
         kind: MetricKind,
         value: f32,
@@ -104,6 +124,11 @@ impl Reading {
         }
         let value = if kind.is_temperature() {
             if !(MIN_TEMPERATURE..=MAX_TEMPERATURE).contains(&value) {
+                return Reading::Unavailable(Reason::ReadFailed);
+            }
+            value
+        } else if kind.is_fan() {
+            if !(0.0..=MAX_FAN_RPM).contains(&value) {
                 return Reading::Unavailable(Reason::ReadFailed);
             }
             value
@@ -135,6 +160,32 @@ mod tests {
         for (i, kind) in MetricKind::ALL.iter().enumerate() {
             assert_eq!(kind.index(), i);
         }
+    }
+
+    #[test]
+    fn gpu_fan_follows_gpu_temperature() {
+        assert_eq!(MetricKind::ALL.len(), 7);
+        assert_eq!(
+            MetricKind::GpuFan.index(),
+            MetricKind::GpuTemperature.index() + 1
+        );
+    }
+
+    #[test]
+    fn fan_speeds_are_range_checked_not_clamped() {
+        assert_eq!(
+            Reading::of(MetricKind::GpuFan, 1240.0).value(),
+            Some(1240.0)
+        );
+        assert_eq!(Reading::of(MetricKind::GpuFan, 0.0).value(), Some(0.0));
+        assert_eq!(
+            Reading::of(MetricKind::GpuFan, 10_001.0),
+            Reading::Unavailable(Reason::ReadFailed)
+        );
+        assert_eq!(
+            Reading::of(MetricKind::GpuFan, -1.0),
+            Reading::Unavailable(Reason::ReadFailed)
+        );
     }
 
     #[test]

@@ -4,7 +4,7 @@
 .DESCRIPTION
     1. cargo build --release (static CRT, icon and version embedded).
     2. Downloads PawnIO.Modules $ModulesVersion and checks the SHA-256 of the CPU Temperature
-       modules (AMDFamily17.bin, IntelMSR.bin) against pinned values.
+       and Fan Speed modules (AMDFamily17.bin, IntelMSR.bin, LpcIO.bin) against pinned values.
     3. Collects third-party notices: Slint, PawnIO.Modules (LGPL-2.1 + source link), and the
        license files of every Rust crate in the build.
     4. Compiles installer/computer-stats.iss with Inno Setup into dist\.
@@ -18,6 +18,8 @@ param(
     [hashtable]$ModuleSha256 = @{
         'AMDFamily17.bin' = 'DAE74615761B78BDF064DFB3E136252DDCC6FC727D88F14738D0E5800D427A91'
         'IntelMSR.bin'    = 'D6ED85D65AB17A22F813EF98207D6D537155EE2DED5976A21CB48413C9B92E5F'
+        # Motherboard Fan Speeds (006 research R7).
+        'LpcIO.bin'       = 'B3896A1CAB0D808FCA31FE2EBCAE045D59DAC690DA87B17C858BB8DA357EB45E'
     },
     [string]$Iscc = (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
 )
@@ -41,7 +43,7 @@ $exeMb = (Get-Item $exe).Length / 1MB
 Write-Host ("exe: {0:N2} MiB" -f $exeMb)
 if ($exeMb -gt 10) { throw 'exe exceeds the 10 MB budget (Constitution I)' }
 
-# 2. CPU Temperature module
+# 2. CPU Temperature and Fan Speed modules
 $zip = Join-Path $work "PawnIO.Modules-$ModulesVersion.zip"
 if (-not (Test-Path $zip)) {
     $tag = $ModulesVersion -replace '\.', '_'
@@ -108,7 +110,7 @@ Slint (https://slint.dev)
   Used under the Slint Royalty-free Desktop, Mobile, and Web Applications License 2.0:
   https://slint.dev/terms-and-conditions#royalty-free
 
-PawnIO.Modules $ModulesVersion - AMDFamily17.bin and IntelMSR.bin (used for CPU Temperature)
+PawnIO.Modules $ModulesVersion - AMDFamily17.bin and IntelMSR.bin (used for CPU Temperature), LpcIO.bin (used for Fan Speeds)
   Copyright (c) namazso. Licensed under the GNU Lesser General Public License v2.1
   (licenses\PawnIO.Modules-LGPL-2.1.txt). Unmodified; source code:
   https://github.com/namazso/PawnIO.Modules/tree/$ModulesVersion

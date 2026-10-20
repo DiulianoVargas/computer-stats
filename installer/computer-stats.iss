@@ -62,6 +62,8 @@ Source: "{#ExePath}"; DestDir: "{app}"; Flags: ignoreversion
 ; is proprietary freeware); the "pawnio" task downloads the official setup instead (004 FR-006).
 Source: "{#PackageDir}\module\AMDFamily17.bin"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\module\IntelMSR.bin"; DestDir: "{app}"; Flags: ignoreversion
+; Motherboard Fan Speeds (006).
+Source: "{#PackageDir}\module\LpcIO.bin"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs
 
