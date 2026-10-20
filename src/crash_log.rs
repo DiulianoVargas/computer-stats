@@ -18,8 +18,10 @@ pub fn install() {
             .map(|s| s.to_string())
             .or_else(|| info.payload().downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "(non-string panic payload)".into());
+        // Function names and lines appear only when the build's .pdb sits next to the exe.
+        let backtrace = std::backtrace::Backtrace::force_capture();
         write(&format!(
-            "panic on thread '{}' at {location}: {message}",
+            "panic on thread '{}' at {location}: {message}\n{backtrace}",
             thread.name().unwrap_or("unnamed")
         ));
     }));

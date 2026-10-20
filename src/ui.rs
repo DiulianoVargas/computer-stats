@@ -8,6 +8,7 @@ use slint::winit_030::winit::platform::windows::{CornerPreference, WindowAttribu
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 
+use crate::crash_log;
 use crate::domain::anchor::{self, Size};
 use crate::domain::app_order::Sort;
 use crate::domain::format;
@@ -66,8 +67,56 @@ thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
 }
 
+/// Runs `f` on the App and returns its result, or `None` if the App is already borrowed.
+///
+/// Win32 and Slint calls made while the App is borrowed (e.g. `Shell_NotifyIconW`, showing the
+/// Panel, reading a Slint property) can deliver window messages or Slint callbacks synchronously,
+/// which re-enter this module. A second `borrow_mut` would panic (and `panic = "abort"` kills the
+/// app), so re-entrant access is refused instead and noted in the crash log.
+#[track_caller]
 fn with_app<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
-    APP.with_borrow_mut(|app| app.as_mut().map(f))
+    let caller = std::panic::Location::caller();
+    APP.with(|cell| match cell.try_borrow_mut() {
+        Ok(mut app) => app.as_mut().map(f),
+        Err(_) => {
+            note_reentry(caller);
+            None
+        }
+    })
+}
+
+/// Runs `f` on the App now, or, if the App is already borrowed (see `with_app`), right after the
+/// current work finishes, on the same UI thread. For events whose effect must not be lost.
+#[track_caller]
+fn update_app(f: impl FnOnce(&mut App) + 'static) {
+    let caller = std::panic::Location::caller();
+    let busy = APP.with(|cell| cell.try_borrow_mut().is_err());
+    if busy {
+        note_reentry(caller);
+        slint::Timer::single_shot(Duration::ZERO, move || update_app(f));
+    } else {
+        with_app(f);
+    }
+}
+
+/// Records each re-entrant call site once per run, for diagnosis.
+fn note_reentry(caller: &'static std::panic::Location<'static>) {
+    thread_local! {
+        static SEEN: RefCell<Vec<&'static std::panic::Location<'static>>> =
+            const { RefCell::new(Vec::new()) };
+    }
+    let first = SEEN.with(|seen| match seen.try_borrow_mut() {
+        Ok(mut seen) if !seen.contains(&caller) => {
+            seen.push(caller);
+            true
+        }
+        _ => false,
+    });
+    if first {
+        crash_log::write(&format!(
+            "re-entrant UI access from {caller}; deferred or skipped"
+        ));
+    }
 }
 
 /// Runs the app until Quit.
@@ -97,10 +146,10 @@ pub fn run() -> Result<(), String> {
 
     let panel = PanelWindow::new().map_err(|e| e.to_string())?;
     panel.on_close_requested(|| {
-        with_app(|app| app.hide());
+        update_app(move |app| app.hide());
     });
     panel.on_view_changed(|view| {
-        with_app(|app| {
+        update_app(move |app| {
             app.set_view(if view == 1 {
                 View::Processes
             } else {
@@ -109,7 +158,7 @@ pub fn run() -> Result<(), String> {
         });
     });
     panel.on_sort_clicked(|column| {
-        with_app(|app| {
+        update_app(move |app| {
             let sort = if column == 1 { Sort::Memory } else { Sort::Cpu };
             app.processes.set_sort(sort);
             app.panel.set_sort(column);
@@ -123,25 +172,25 @@ pub fn run() -> Result<(), String> {
         }
         // Expire arming and row feedback later (FR-012, FR-016).
         slint::Timer::single_shot(processes_ui::expire_after(), || {
-            with_app(|app| app.processes.expire());
+            update_app(move |app| app.processes.expire());
         });
     });
     // Re-anchor as soon as the height changes, not at the next Snapshot (no visible jump).
     panel.on_panel_height_changed(|| {
-        with_app(|app| {
+        update_app(move |app| {
             if app.visible {
                 app.place_if_resized();
             }
         });
     });
     panel.on_background_clicked(|| {
-        with_app(|app| app.processes.cancel_arming());
+        update_app(move |app| app.processes.cancel_arming());
     });
     // Click outside: the Panel loses focus (FR-008). Handled after winit's dispatch returns.
     panel.window().on_winit_window_event(|_, event| {
         if let WindowEvent::Focused(false) = event {
             let _ = slint::invoke_from_event_loop(|| {
-                with_app(|app| {
+                update_app(move |app| {
                     if app.visible {
                         app.hide();
                         app.hidden_by_deactivation = Some(Instant::now());
@@ -188,7 +237,7 @@ pub fn run() -> Result<(), String> {
 }
 
 fn on_snapshot(mut snapshot: Snapshot) {
-    with_app(|app| {
+    update_app(move |app| {
         app.tray.set_tooltip(&snapshot.tooltip);
         if let Some(sample) = snapshot.processes.take()
             && app.visible
@@ -211,17 +260,17 @@ fn on_snapshot(mut snapshot: Snapshot) {
 fn on_tray_event(event: TrayEvent) {
     match event {
         TrayEvent::Select => {
-            with_app(|app| app.toggle());
+            update_app(move |app| app.toggle());
         }
         TrayEvent::OpenPanel => {
-            with_app(|app| {
+            update_app(move |app| {
                 if !app.visible {
                     app.open();
                 }
             });
         }
         TrayEvent::AppearanceChanged => {
-            with_app(|app| {
+            update_app(move |app| {
                 let wanted = (app.icon.0, tray_theme(), app.tray.icon_size());
                 app.update_icon_to(wanted);
             });
@@ -255,7 +304,7 @@ fn on_tray_event(event: TrayEvent) {
                     };
                     // On failure the checkmark keeps the old state; no dialog (contracts/ui.md).
                     if result.is_ok() {
-                        with_app(|app| app.start_with_windows = !checked);
+                        update_app(move |app| app.start_with_windows = !checked);
                     }
                 }
                 Some(MENU_QUIT) => {
@@ -297,7 +346,7 @@ impl App {
         // The winit window, and with it the Drive rows' height, may only exist after this
         // event-loop turn; re-place and focus it then.
         let _ = slint::invoke_from_event_loop(|| {
-            with_app(|app| {
+            update_app(move |app| {
                 app.place_if_resized();
                 app.panel.window().with_winit_window(|w| w.focus_window());
             });
