@@ -53,6 +53,27 @@ Resource budgets (Constitution I):
 .\scripts\measure.ps1 -Minutes 10 -PanelOpen # Panel open
 ```
 
+## Package (installer and portable zip)
+
+```powershell
+winget install JRSoftware.InnoSetup   # once
+.\scripts\package.ps1
+```
+
+Produces in `dist\`:
+
+- `ComputerStats-Setup-<version>.exe`: installs to Program Files with a Start menu shortcut (and
+  an optional desktop one), closes a running copy first, and its uninstaller also removes the
+  Start with Windows task.
+- `ComputerStats-<version>-portable.zip`: unzip and run `computer-stats.exe`.
+
+The exe has no runtime dependencies beyond Windows (static C runtime). Both packages include
+`AMDFamily17.bin` (PawnIO.Modules, LGPL-2.1, hash-checked) and the third-party notices; the PawnIO
+driver itself must be installed separately for CPU Temperature. The packages are not code-signed,
+so Windows SmartScreen shows "Windows protected your PC" the first time (More info → Run anyway).
+
+The app icon is generated in code (`cargo run --example make_icon` rewrites `assets/app.ico`).
+
 ## Third-party
 
 This application is built with [Slint](https://slint.dev), used under the

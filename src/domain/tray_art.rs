@@ -66,6 +66,60 @@ pub fn render(size_px: u32, theme: TrayTheme, dot: WarningLevel) -> Vec<u32> {
     pixels
 }
 
+/// The application icon (Explorer, Start menu, installer): the three bars in white on a blue
+/// rounded square, so it reads on light and dark backgrounds. Premultiplied ARGB, top row first;
+/// edges are anti-aliased with 4 × 4 supersampling.
+pub fn app_icon(size_px: u32) -> Vec<u32> {
+    const BLUE: [f32; 3] = [0x0F as f32, 0x6C as f32, 0xBD as f32];
+    const SS: u32 = 4;
+    let n = size_px as usize;
+    let s = size_px as f32;
+    let radius = s * 0.22;
+    let inset = s * 0.16;
+    let glyph = render(size_px, TrayTheme::Dark, WarningLevel::Normal);
+    let mut out = vec![0u32; n * n];
+    for y in 0..n {
+        for x in 0..n {
+            // Coverage of the rounded square at this pixel.
+            let mut covered = 0u32;
+            for sy in 0..SS {
+                for sx in 0..SS {
+                    let px = x as f32 + (sx as f32 + 0.5) / SS as f32;
+                    let py = y as f32 + (sy as f32 + 0.5) / SS as f32;
+                    if in_rounded_square(px, py, s, radius) {
+                        covered += 1;
+                    }
+                }
+            }
+            if covered == 0 {
+                continue;
+            }
+            let alpha = covered as f32 / (SS * SS) as f32;
+            // The glyph, shrunk into the square's inner area (nearest sample).
+            let gx = ((x as f32 - inset) / (s - 2.0 * inset) * s) as isize;
+            let gy = ((y as f32 - inset) / (s - 2.0 * inset) * s) as isize;
+            let on_glyph = (0..n as isize).contains(&gx)
+                && (0..n as isize).contains(&gy)
+                && glyph[gy as usize * n + gx as usize] != 0;
+            let rgb = if on_glyph { [255.0; 3] } else { BLUE };
+            out[y * n + x] = premultiplied(rgb, alpha);
+        }
+    }
+    out
+}
+
+fn in_rounded_square(x: f32, y: f32, s: f32, r: f32) -> bool {
+    let cx = x.clamp(r, s - r);
+    let cy = y.clamp(r, s - r);
+    (x - cx).powi(2) + (y - cy).powi(2) <= r * r
+}
+
+fn premultiplied(rgb: [f32; 3], alpha: f32) -> u32 {
+    let a = (alpha * 255.0).round() as u32;
+    let c = |v: f32| (v * alpha).round() as u32;
+    (a << 24) | (c(rgb[0]) << 16) | (c(rgb[1]) << 8) | c(rgb[2])
+}
+
 fn fill(
     pixels: &mut [u32],
     n: usize,
@@ -139,6 +193,20 @@ mod tests {
             assert_eq!(center(&render(size, TrayTheme::Light, Critical)), RED);
             // Top-left stays transparent.
             assert_eq!(render(size, TrayTheme::Dark, Critical)[0], 0);
+        }
+    }
+
+    #[test]
+    fn app_icon_is_a_blue_rounded_square_with_white_bars() {
+        for size in [16u32, 32, 48, 256] {
+            let n = size as usize;
+            let p = app_icon(size);
+            assert_eq!(p.len(), n * n);
+            // Rounded corners stay transparent; the centre-left edge is opaque blue.
+            assert_eq!(p[0], 0, "size {size}");
+            assert_eq!(p[(n / 2) * n + 1], 0xFF0F_6CBD, "size {size}");
+            // Some white glyph pixels.
+            assert!(p.contains(&0xFFFF_FFFF), "size {size}");
         }
     }
 }
