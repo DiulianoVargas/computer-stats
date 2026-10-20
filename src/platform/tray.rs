@@ -297,31 +297,37 @@ fn full_data(state: &State) -> NOTIFYICONDATAW {
 
 /// Adds the icon (startup and after Explorer restarts). Returns whether it succeeded.
 fn add_icon() -> bool {
-    STATE.with_borrow(|s| {
-        let Some(state) = s else { return false };
-        let mut nid = full_data(state);
-        // SAFETY: `nid` is fully initialized and identifies our window.
-        unsafe {
-            // A stale icon with our GUID (e.g. after a crash) makes NIM_ADD fail; remove it first.
-            let _ = Shell_NotifyIconW(NIM_DELETE, &nid);
-            if !Shell_NotifyIconW(NIM_ADD, &nid).as_bool() {
-                return false;
-            }
-            nid.Anonymous.uVersion = NOTIFYICON_VERSION_4;
-            let _ = Shell_NotifyIconW(NIM_SETVERSION, &nid);
+    // Build the data, release the state, then call the shell: Shell_NotifyIconW can deliver
+    // window messages synchronously, and nothing may hold `STATE` while that happens.
+    let Some(mut nid) = current_data() else {
+        return false;
+    };
+    // SAFETY: `nid` is fully initialized and identifies our window.
+    unsafe {
+        // A stale icon with our GUID (e.g. after a crash) makes NIM_ADD fail; remove it first.
+        let _ = Shell_NotifyIconW(NIM_DELETE, &nid);
+        if !Shell_NotifyIconW(NIM_ADD, &nid).as_bool() {
+            return false;
         }
-        true
+        nid.Anonymous.uVersion = NOTIFYICON_VERSION_4;
+        let _ = Shell_NotifyIconW(NIM_SETVERSION, &nid);
+    }
+    true
+}
+
+/// The current icon data, copied out of `STATE` (`None` before `create` or if it is busy).
+fn current_data() -> Option<NOTIFYICONDATAW> {
+    STATE.with(|cell| {
+        let state = cell.try_borrow().ok()?;
+        state.as_ref().map(full_data)
     })
 }
 
 fn modify() {
-    STATE.with_borrow(|s| {
-        if let Some(state) = s {
-            let nid = full_data(state);
-            // SAFETY: `nid` is fully initialized and identifies our icon.
-            let _ = unsafe { Shell_NotifyIconW(NIM_MODIFY, &nid) };
-        }
-    });
+    if let Some(nid) = current_data() {
+        // SAFETY: `nid` is fully initialized and identifies our icon.
+        let _ = unsafe { Shell_NotifyIconW(NIM_MODIFY, &nid) };
+    }
 }
 
 // --- Icon GUID -------------------------------------------------------------------------------

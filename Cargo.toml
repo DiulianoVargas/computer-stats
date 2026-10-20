@@ -3,7 +3,8 @@ name = "computer-stats"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "Lightweight Windows tray visualizer for Metrics"
+description = "Lightweight Windows tray visualizer for Metrics and Processes"
+authors = ["Diuliano Vargas"]
 
 # The app logic lives in the library so `cargo test` runs it without the elevation manifest,
 # which is embedded only in the binary (research R6).
@@ -46,6 +47,8 @@ windows = { version = "0.62", default-features = false, features = [
 [build-dependencies]
 # Compiles ui/*.slint into Rust at build time.
 slint-build = "1.18"
+# Embeds the app icon and version info (rc.exe from the Windows SDK); build-time only.
+embed-resource = "3"
 
 [profile.release]
 lto = true

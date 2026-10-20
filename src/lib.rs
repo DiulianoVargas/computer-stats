@@ -2,6 +2,7 @@
 
 #![deny(unsafe_code)]
 
+mod crash_log;
 pub mod domain;
 #[allow(unsafe_code)]
 mod platform;
@@ -20,5 +21,10 @@ mod generated {
 
 /// Runs the app until the user chooses Quit.
 pub fn run() -> Result<(), String> {
-    ui::run()
+    crash_log::install();
+    let result = ui::run();
+    if let Err(e) = &result {
+        crash_log::write(&format!("startup failed: {e}"));
+    }
+    result
 }
