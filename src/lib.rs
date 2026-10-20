@@ -17,6 +17,6 @@ mod generated {
 }
 
 /// Runs the app until the user chooses Quit.
-pub fn run() {
-    let _panel = generated::PanelWindow::new();
+pub fn run() -> Result<(), String> {
+    ui::run()
 }

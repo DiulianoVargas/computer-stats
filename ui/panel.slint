@@ -1,3 +1,64 @@
+// The Panel (contracts/ui.md): stacked sections, read-only, Esc closes it.
+import { Theme } from "theme.slint";
+
+component SectionHeader inherits Text {
+    color: Theme.section-text;
+    font-size: Theme.section-font-size;
+    font-weight: 600;
+}
+
 export component PanelWindow inherits Window {
     title: "Computer Stats";
+    no-frame: true;
+    always-on-top: true;
+    width: 340px;
+    max-height: 640px;
+    background: Theme.background;
+    default-font-size: Theme.font-size;
+    forward-focus: keys;
+
+    // Esc pressed; the app hides the Panel.
+    callback close-requested();
+
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.close-requested();
+                return accept;
+            }
+            reject
+        }
+
+        Rectangle {
+            border-width: 1px;
+            border-color: Theme.border;
+
+            VerticalLayout {
+                padding: Theme.padding;
+                spacing: Theme.section-gap;
+
+                VerticalLayout {
+                    spacing: Theme.row-gap;
+                    SectionHeader { text: "CPU"; }
+                }
+
+                VerticalLayout {
+                    spacing: Theme.row-gap;
+                    SectionHeader { text: "GPU"; }
+                }
+
+                VerticalLayout {
+                    spacing: Theme.row-gap;
+                    SectionHeader { text: "Memory"; }
+                }
+
+                VerticalLayout {
+                    spacing: Theme.row-gap;
+                    SectionHeader { text: "Drives"; }
+                }
+
+                // App Volumes section: added below the Metrics by a later feature (FR-010).
+            }
+        }
+    }
 }
