@@ -95,10 +95,12 @@ foreach ($c in $crates) {
 }
 Set-Content -Path "$work\licenses\rust-crates.txt" -Value $sb.ToString() -Encoding utf8
 Write-Host "notices: $($crates.Count) Rust crates"
+Copy-Item (Join-Path $root 'LICENSE') "$work\licenses\Computer-Stats-LICENSE.txt" -Force
 
 @"
 Computer Stats $version
 https://github.com/DiulianoVargas/computer-stats
+Copyright (c) 2026 Diuliano Vargas. MIT License (licenses\Computer-Stats-LICENSE.txt).
 
 This application includes third-party software:
 

@@ -5,6 +5,8 @@ edition = "2024"
 publish = false
 description = "Lightweight Windows tray visualizer for Metrics and Processes"
 authors = ["Diuliano Vargas"]
+license = "MIT"
+repository = "https://github.com/DiulianoVargas/computer-stats"
 
 # The app logic lives in the library so `cargo test` runs it without the elevation manifest,
 # which is embedded only in the binary (research R6).

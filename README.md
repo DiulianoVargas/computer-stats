@@ -212,8 +212,8 @@ has a specification, a plan, research notes and a task list before any code.
 
 ## License
 
-No open-source license has been chosen yet, so all rights are reserved by the author. Third-party
-components keep their own licenses (below).
+Computer Stats is released under the [MIT License](LICENSE). Third-party components keep their own
+licenses (below).
 
 ## Third-party
 
