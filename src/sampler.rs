@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::domain::metric::{MetricKind, Reading, Reason};
 use crate::platform::cpu::CpuTimes;
-use crate::platform::nvml::{GpuReadings, GpuSource};
+use crate::platform::gpu::{GpuReadings, GpuSource};
 use crate::platform::pawnio::CpuTemperatureSource;
 use crate::platform::{drives, memory};
 use crate::snapshot::{APP_NAME, DriveState, MetricState, Snapshot};
@@ -41,7 +41,7 @@ impl Sampler {
 
     /// One tick. Must never panic (Constitution VIII).
     fn tick(&mut self) -> Snapshot {
-        let gpu = match &self.gpu {
+        let gpu = match &mut self.gpu {
             Ok(source) => source.read(),
             Err(reason) => GpuReadings::unavailable(*reason),
         };

@@ -135,13 +135,27 @@
 | Memory Usage | `GlobalMemoryStatusEx` (`ullTotalPhys`, `ullAvailPhys`) | read failed |
 | Disk Space | `GetLogicalDrives` → `GetDriveTypeW == DRIVE_FIXED` → exclude USB bus (`IOCTL_STORAGE_QUERY_PROPERTY`, `BusTypeUsb`) → `GetDiskFreeSpaceExW`, `GetVolumeInformationW` (label) | read failed (per Drive) |
 | CPU Temperature | PawnIO + `AMDFamily17.bin`, from spike 001 (`platform.rs`, `reading.rs`) | not elevated, unsupported CPU, driver not found, module not found, read failed |
-| GPU Usage, VRAM, GPU Temperature | NVML (R9) | no GPU, driver not found, read failed |
+| GPU Usage, VRAM, GPU Temperature | Windows graphics statistics, D3DKMT (R9) | no GPU, driver not found, read failed |
 
 - Drive enumeration runs every 5 s (FR-022); free space of known Drives is read every tick.
 - PawnIO is opened **once** for the app's lifetime and shared (spike verdict: ~7 MB).
 - "module not found" is split from "driver not found", as the spike verdict recommended.
 
-## R9. NVML
+## R9. GPU Metrics (amended 2026-10-20: D3DKMT replaces NVML, ADR-0003)
+
+- **Decision (current)**: read the GPU Metrics from the Windows kernel graphics interface in
+  `gdi32.dll`, the source Task Manager uses. `D3DKMTEnumAdapters2` lists adapters; the GPU is the
+  hardware render adapter with the most `DedicatedVideoMemorySize` (≥ 1 GiB; integrated graphics
+  are ignored). Per tick: GPU Usage = the busiest node's running-time delta over wall time
+  (`D3DKMT_QUERYSTATISTICS_NODE`); VRAM = bytes resident in non-aperture segments
+  (`D3DKMT_QUERYSTATISTICS_SEGMENT`) over `DedicatedVideoMemorySize`; GPU Temperature =
+  `KMTQAITYPE_ADAPTERPERFDATA` `Temperature` (tenths of °C; 0 = not reported → read failed).
+- **Why**: NVML measured ≈ 19.5 MB private memory (measurements.md T028); D3DKMT ≈ 1 MB.
+  Validated against `nvidia-smi` on a GTX 1660 SUPER: VRAM used 1.3 GB vs 1325 MiB, temperature
+  within 2 °C, usage matches Task Manager's counters.
+- The NVML decision below is kept for history.
+
+### Superseded: NVML
 
 - **Decision**: Load `nvml.dll` at runtime (`LoadLibraryExW` with `LOAD_LIBRARY_SEARCH_SYSTEM32`;
   modern NVIDIA drivers install it in System32) and resolve `nvmlInit_v2`,

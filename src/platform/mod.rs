@@ -3,8 +3,8 @@
 
 pub mod cpu;
 pub mod drives;
+pub mod gpu;
 pub mod memory;
-pub mod nvml;
 pub mod pawnio;
 pub mod shell;
 pub mod theme;

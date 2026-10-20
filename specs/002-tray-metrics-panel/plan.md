@@ -7,7 +7,7 @@
 ## Summary
 
 The first real app crate, at the repository root. A `sampler` thread reads every Metric once per
-second (Win32 system APIs, NVML, and PawnIO from spike 001), keeps the Sparkline histories and
+second (Win32 system APIs, Windows graphics statistics, and PawnIO from spike 001), keeps the Sparkline histories and
 Warning Levels, and sends an immutable Snapshot to the UI thread. The UI thread owns a hand-made
 Win32 Tray Icon (with a code-drawn Status Dot) and a single hidden Slint Panel, rendered in
 software, that is shown anchored to the icon and hidden when it loses focus. Start with Windows is
@@ -21,7 +21,7 @@ Dot, formatting, anchoring, icon pixels, task XML) is pure and unit-tested; all 
 
 **Primary Dependencies**: `slint` 1.18 (software renderer, winit backend), `windows` 0.62 (Win32
 FFI), `raw-window-handle` 0.6 (Panel HWND); build: `slint-build` 1.18. Runtime: PawnIO +
-`AMDFamily17.bin`, `nvml.dll` (both optional)
+`AMDFamily17.bin` (optional)
 
 **Storage**: None. Start with Windows state lives in Task Scheduler.
 
@@ -45,12 +45,12 @@ FFI), `raw-window-handle` 0.6 (Panel HWND); build: `slint-build` 1.18. Runtime: 
 
 | Principle | Status | How |
 |-----------|--------|-----|
-| I. Resource Budgets | ✅ | Software renderer, Panel hidden not re-created, no Panel updates while hidden, PawnIO opened once; `scripts/measure.ps1` added and run in Polish. NVML's footprint is measured early (R9 risk) |
+| I. Resource Budgets | ✅ | Software renderer, Panel hidden not re-created, no Panel updates while hidden, PawnIO opened once; `scripts/measure.ps1` added and run in Polish. GPU via D3DKMT, not NVML (R9, ADR-0003) |
 | II. Native Only | ✅ | Slint native window; no web view; `deny.toml` bans `wry`, `webview2-com`, `tauri` |
 | III. Unsafe Isolation | ✅ | All FFI in `src/platform/` (`#[allow(unsafe_code)] mod platform;`); crate root `#![deny(unsafe_code)]` |
-| IV. Elevated Minimal Surface | ✅ | No network crates (banned); only `schtasks.exe` is spawned; only the signed PawnIO module and System32 `nvml.dll` are loaded |
+| IV. Elevated Minimal Surface | ✅ | No network crates (banned); only `schtasks.exe` is spawned; only the signed PawnIO module is loaded |
 | V. Software Rendering | ✅ | `renderer-software`, `default-features = false` |
-| VI. Dependency Discipline | ✅ | Three runtime crates, each justified (R1, R4); tray and NVML hand-written instead of `tray-icon`/`nvml-wrapper` (R2, R9); `cargo deny check`; Slint royalty-free attribution in `README.md` |
+| VI. Dependency Discipline | ✅ | Three runtime crates, each justified (R1, R4); tray hand-written instead of `tray-icon` (R2); GPU from the OS, no vendor library (R9); `cargo deny check`; Slint royalty-free attribution in `README.md` |
 | VII. Sampling Discipline | ✅ | Timer-driven `sampler` thread (R10); fixed 60-slot ring buffers |
 | VIII. Graceful Degradation | ✅ | Each source returns `Reading::Unavailable(Reason)`; no `unwrap`/`expect` outside tests (clippy-denied) |
 | IX. Code Hygiene | ✅ | fmt, clippy `-D warnings`; identifiers use `CONTEXT.md` terms (`WarningLevel`, `StatusDot`, `Sparkline`, `Drive`, `Panel`, `TrayIcon`) |
@@ -115,7 +115,7 @@ src/
     ├── memory.rs        # GlobalMemoryStatusEx
     ├── drives.rs        # enumeration, USB exclusion, free space, label
     ├── pawnio.rs        # from spike platform.rs (elevation, CPUID, PawnIo)
-    ├── nvml.rs          # runtime-loaded NVML
+    ├── gpu.rs           # D3DKMT GPU statistics (ADR-0003)
     ├── tray.rs          # hidden window, Shell_NotifyIconW, menu, TaskbarCreated, HICON
     ├── window.rs        # Panel HWND: tool window, corners, deactivate subclass, foreground
     ├── shell.rs         # icon rect, taskbar edge, work area, monitor DPI
@@ -141,4 +141,4 @@ hold everything that can be tested without Windows; `src/platform/` is the only 
 
 | Item | Status |
 |------|--------|
-| NVML costs ≈ 19.5 MB private memory (T028, measurements.md); with PawnIO (≈ 7 MB) the Panel-closed total is ≈ 29 MB of the 30 MB budget (Constitution I) | **Open, needs a decision.** Candidate: read GPU Usage, VRAM and GPU Temperature from the Windows kernel graphics interface (`D3DKMTQueryStatistics` / `D3DKMTQueryAdapterInfo` adapter perf data, what Task Manager uses) instead of NVML, which would need a constitution amendment (Technical Constraints name NVML) |
+| NVML costs ≈ 19.5 MB private memory (T028, measurements.md); with PawnIO (≈ 7 MB) the Panel-closed total is ≈ 29 MB of the 30 MB budget (Constitution I) | **Resolved 2026-10-20**: GPU Metrics read through D3DKMT (ADR-0003, constitution 1.1.0); Panel closed now 3.5 MB (not elevated) |

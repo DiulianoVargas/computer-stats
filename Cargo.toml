@@ -20,7 +20,9 @@ test = false
 # crates) gives the Panel's winit attributes and focus events (research R4).
 slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "unstable-winit-030"] }
 # Win32 FFI for the Tray Icon, Panel window tweaks and Metric sources (Constitution III: used only in src/platform/).
+# Wdk_Graphics_Direct3D: D3DKMT GPU statistics in gdi32 (ADR-0003).
 windows = { version = "0.62", default-features = false, features = [
+    "Wdk_Graphics_Direct3D",
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",

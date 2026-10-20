@@ -92,7 +92,7 @@ click the desktop, then right-click → Quit (quickstart Q1, Q2, Q3, Q9, Q12, Q1
 - [X] T023 [P] [US1] Create `src/platform/memory.rs`: `memory_usage() -> Reading` from `GlobalMemoryStatusEx` with `used_bytes = ullTotalPhys − ullAvailPhys`, `total_bytes = ullTotalPhys`, value = used % (research R8)
 - [X] T024 [P] [US1] Create `src/platform/drives.rs`: `enumerate() -> Vec<char>` with `GetLogicalDrives` → `GetDriveTypeW == DRIVE_FIXED` → exclude volumes whose `IOCTL_STORAGE_QUERY_PROPERTY` bus type is `BusTypeUsb`; `read(letter) -> Result<Drive, Reason>` with `GetDiskFreeSpaceExW` and `GetVolumeInformationW` for the label (research R8; FR-022)
 - [X] T025 [P] [US1] Create `src/platform/pawnio.rs` by copying elevation check, CPUID and the PawnIO handle from `spikes/cpu-temp/src/platform.rs`; expose `CpuTemperatureSource::open() -> Result<Self, Reason>` (opened **once** for the app's lifetime) and `read(&mut self) -> Reading` using `domain::cpu_temp`; not elevated → `NotElevated`, missing `AMDFamily17.bin` → `ModuleNotFound`, missing driver → `DriverNotFound` (depends on T019)
-- [X] T026 [P] [US1] Create `src/platform/nvml.rs`: load `nvml.dll` with `LoadLibraryExW(LOAD_LIBRARY_SEARCH_SYSTEM32)` and resolve `nvmlInit_v2`, `nvmlDeviceGetCount_v2`, `nvmlDeviceGetHandleByIndex_v2`, `nvmlDeviceGetUtilizationRates`, `nvmlDeviceGetMemoryInfo`, `nvmlDeviceGetTemperature` (`NVML_TEMPERATURE_GPU`), `nvmlShutdown`; `GpuSource::open() -> Result<Self, Reason>` (DLL missing or count 0 → `NoGpu`, `NVML_ERROR_DRIVER_NOT_LOADED` → `DriverNotFound`), device index 0; `read(&self) -> (Reading, Reading, Reading)` for GPU Usage, GPU Temperature, VRAM, each failing independently with `ReadFailed`; `Drop` calls `nvmlShutdown` (research R9)
+- [X] T026 [P] [US1] *(Replaced by `src/platform/gpu.rs` + `src/domain/gpu.rs` on D3DKMT after T028, ADR-0003.)* Create `src/platform/nvml.rs`: load `nvml.dll` with `LoadLibraryExW(LOAD_LIBRARY_SEARCH_SYSTEM32)` and resolve `nvmlInit_v2`, `nvmlDeviceGetCount_v2`, `nvmlDeviceGetHandleByIndex_v2`, `nvmlDeviceGetUtilizationRates`, `nvmlDeviceGetMemoryInfo`, `nvmlDeviceGetTemperature` (`NVML_TEMPERATURE_GPU`), `nvmlShutdown`; `GpuSource::open() -> Result<Self, Reason>` (DLL missing or count 0 → `NoGpu`, `NVML_ERROR_DRIVER_NOT_LOADED` → `DriverNotFound`), device index 0; `read(&self) -> (Reading, Reading, Reading)` for GPU Usage, GPU Temperature, VRAM, each failing independently with `ReadFailed`; `Drop` calls `nvmlShutdown` (research R9)
 
 ### Sampling, Panel and Tray Menu
 
@@ -226,7 +226,7 @@ Task: "T022 Create src/platform/cpu.rs"
 Task: "T023 Create src/platform/memory.rs"
 Task: "T024 Create src/platform/drives.rs"
 Task: "T025 Create src/platform/pawnio.rs"
-Task: "T026 Create src/platform/nvml.rs"
+Task: "T026 Create src/platform/gpu.rs (D3DKMT, ADR-0003)"
 
 # Slint components and shell helpers:
 Task: "T029 Create ui/metric-row.slint"
@@ -241,7 +241,7 @@ Task: "T032 Create src/platform/shell.rs"
 ### MVP First (User Story 1 only)
 
 1. Phase 1 Setup → Phase 2 Foundational (measure the skeleton, T017).
-2. Phase 3 US1; measure NVML early (T028).
+2. Phase 3 US1; measure the GPU source early (T028; led to ADR-0003).
 3. **Stop and validate** with quickstart Q1–Q3, Q9, Q12, Q15.
 
 ### Incremental Delivery

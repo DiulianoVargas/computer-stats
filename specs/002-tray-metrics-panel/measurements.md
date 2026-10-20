@@ -42,3 +42,17 @@ only ≈ 1 MB. Spike 001 measured PawnIO at ≈ 7 MB, so the elevated, Panel-clo
 
 The plan's mitigation ("load lazily / unload after N failures") does not apply: the GPU Metrics are
 sampled every second for the Status Dot and Sparklines. See plan.md Complexity Tracking.
+
+## After ADR-0003: GPU Metrics through D3DKMT (2026-10-20)
+
+Not elevated; same scenario as above. Exe 8.25 MiB.
+
+| Scenario | Private memory (max) | CPU (mean) |
+|----------|----------------------|------------|
+| Panel open, 1 min | 3.6 MB | 0.04 % |
+| Panel closed, 2 min | 3.5 MB | 0.04 % |
+
+Accuracy vs `nvidia-smi` (GTX 1660 SUPER, idle): VRAM used 1.3 GB vs 1325 MiB and Windows'
+`GPU Adapter Memory\Dedicated Usage` counter 1.30 GB; GPU Temperature 37 °C vs 35 °C; GPU Usage 0 %
+vs the `GPU Engine` counters' 1.1 % (nvidia-smi reports 10 %: a different definition). VRAM total is
+5.8 GB (`DedicatedVideoMemorySize`, usable by Windows) vs 6.0 GB in nvidia-smi.

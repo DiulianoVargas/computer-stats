@@ -7,7 +7,8 @@
 3. For CPU Temperature: PawnIO **Official** edition installed, and `AMDFamily17.bin` (from the
    PawnIO.Modules `release_X_Y_Z.zip` asset) copied next to the built executable, as in
    spike 001.
-4. An NVIDIA GPU with its driver, for the GPU Metrics (optional: without it they show `— no GPU`).
+4. A dedicated GPU with its driver, for the GPU Metrics (optional: without it they show `— no GPU`).
+   GPU Temperature needs a driver that reports it to Windows (WDDM 2.4+, as in Task Manager).
 
 ## Build and unit tests (no elevation needed)
 
@@ -51,7 +52,7 @@ Budget check (Constitution I):
 | Q6 | Disk Space rule (US2) | A Drive at 85–94% used | Drive amber in the Panel; Status Dot unaffected |
 | Q7 | Sparklines (US3) | Wait 60 s, run a 20 s CPU load, open the Panel | CPU Usage/Temperature Sparklines show the rise and fall with full 60 s history |
 | Q8 | Start with Windows (US4) | Check it, sign out and in; then uncheck, sign out and in | App starts elevated with no UAC prompt; then it no longer starts. `schtasks /Query /TN "Computer Stats"` matches |
-| Q9 | Degradation (SC-006) | Rename `AMDFamily17.bin`; separately run as a standard user; separately on a PC without an NVIDIA GPU (or rename access via a debug flag) | The affected Metric shows `—` + reason; the rest work; 10 min without crash |
+| Q9 | Degradation (SC-006) | Rename `AMDFamily17.bin`; separately run as a standard user; separately on a PC without a dedicated GPU | The affected Metric shows `—` + reason; the rest work; 10 min without crash |
 | Q10 | Single instance | Launch the exe again while running | No second Tray Icon; the Panel opens |
 | Q11 | Explorer restart | `Stop-Process -Name explorer` (it restarts) | Tray Icon reappears within a few seconds |
 | Q12 | Taskbar & DPI | Move the taskbar to the top (or use a second monitor at 150%) | Panel anchors next to the icon, fully on screen, sharp text |
