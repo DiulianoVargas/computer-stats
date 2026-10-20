@@ -31,12 +31,14 @@ Memory
 - Same rows, labels, value formats, `—` reasons, Warning Level colours and Sparkline scales as
   the Panel's Metrics View, for exactly these five Metrics (FR-002). No VRAM, no Drives, no App
   Volumes, no Processes (FR-011).
-- No background card. Every text and Sparkline has a halo for contrast (research R7):
+- A semi-transparent card behind the rows: the Panel's background and border at 75 % opacity,
+  8 px corners, 12 px padding. Replaces the halos of the first build, which read poorly
+  (user feedback, 2026-10-20):
 
-| Mode | Content | Halo |
-|------|---------|------|
-| Dark | `#ffffff`, muted `#c8c8c8` | `#000000` at 70 % |
-| Light | `#1b1b1b`, muted `#424242` | `#ffffff` at 70 % |
+| Mode | Content | Card | Border |
+|------|---------|------|--------|
+| Dark | `#ffffff`, muted `#c8c8c8` | `#202020` at 75 % | `#3a3a3a` at 75 % |
+| Light | `#1b1b1b`, muted `#424242` | `#f9f9f9` at 75 % | `#e0e0e0` at 75 % |
 
 - Warning and Critical use the Panel's colours for the active mode.
 

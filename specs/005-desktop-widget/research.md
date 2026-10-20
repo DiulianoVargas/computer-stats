@@ -71,12 +71,17 @@
 ## R4. Staying visible on "Show desktop" (Win+D)
 
 - **Decision**: an out-of-context `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` on the UI thread.
-  - **Raise**: Show desktop brings the shell desktop window (class `WorkerW` or `Progman`) to the
-    front as a **topmost** window. When that happens, the Desktop Widget is raised with
-    `SetWindowPos(HWND_TOPMOST, SWP_NOACTIVATE)` above it, and the `WM_WINDOWPOSCHANGING` guard is
-    switched off.
-  - **Plain click**: clicking the desktop also makes it foreground, but not topmost, so the widget
-    is not raised over other windows.
+  - **Raise**: whenever the shell desktop window (class `WorkerW` or `Progman`) becomes
+    foreground, the Desktop Widget is raised with `SetWindowPos(HWND_TOPMOST, SWP_NOACTIVATE)`
+    and the `WM_WINDOWPOSCHANGING` guard is switched off.
+  - **Spike S2, 2026-10-20 (Windows 11 build 26300)**: Show desktop raises `Progman` over the
+    windows **without** making it topmost, so the first build, which raised only for a topmost
+    desktop, stayed hidden. The topmost check was dropped. Placing the widget just above
+    `Progman` instead was tried and rejected: `Progman` moves after the foreground event, and the
+    widget ended up over restored windows.
+  - **Plain click**: clicking the desktop also makes it foreground, so it raises the widget too,
+    over any windows still open, until another window comes to the front. Accepted: going to the
+    desktop is when the user wants to see it.
   - **Lower**: when any other window becomes foreground, the widget goes `HWND_NOTOPMOST` then
     `HWND_BOTTOM`.
   - **Prior art**: the same idea as Rainmeter's "On desktop" mode.
@@ -131,7 +136,10 @@
 
 ## R7. Readable over any wallpaper
 
-- **Decision**: no card behind the content (FR-010). Each Text gets a **halo**, four copies offset
+- **Revised 2026-10-20**: after trying the first build, the user found the halos hard to read and
+  chose a semi-transparent card instead: the Panel's background and border at 75 % alpha, 8 px
+  corners (contracts/ui.md). The halos were removed. The original decision follows.
+- **Original decision**: no card behind the content (FR-010). Each Text gets a **halo**, four copies offset
   by ±1 px drawn first in a contrasting colour at ~70 % alpha. Each Sparkline is drawn twice, a
   3 px halo stroke under the 1.5 px line. In dark mode the content is light with a dark halo; in
   light mode it is dark with a light halo. Warning Level colours use the Panel's `Theme.warning` /

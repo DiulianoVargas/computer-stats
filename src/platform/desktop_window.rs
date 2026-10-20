@@ -19,14 +19,14 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook, UnhookWinEvent};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
-    GetClassNameW, GetWindowLongPtrW, GetWindowRect, HTCAPTION, HWND_BOTTOM, HWND_NOTOPMOST,
-    HWND_TOPMOST, MA_NOACTIVATE, RegisterClassW, SPI_SETWORKAREA, SW_HIDE, SW_SHOWNOACTIVATE,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos, ShowWindow, ULW_ALPHA,
-    UpdateLayeredWindow, WINDOWPOS, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_CLOSE,
-    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_EXITSIZEMOVE, WM_MOUSEACTIVATE, WM_NCHITTEST,
-    WM_NCLBUTTONDBLCLK, WM_NCRBUTTONDOWN, WM_NCRBUTTONUP, WM_SETTINGCHANGE, WM_WINDOWPOSCHANGING,
-    WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND, GetClassNameW,
+    GetWindowRect, HTCAPTION, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOPMOST, MA_NOACTIVATE,
+    RegisterClassW, SPI_SETWORKAREA, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SWP_NOZORDER, SetWindowPos, ShowWindow, ULW_ALPHA, UpdateLayeredWindow, WINDOWPOS,
+    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_CLOSE, WM_DISPLAYCHANGE, WM_DPICHANGED,
+    WM_EXITSIZEMOVE, WM_MOUSEACTIVATE, WM_NCHITTEST, WM_NCLBUTTONDBLCLK, WM_NCRBUTTONDOWN,
+    WM_NCRBUTTONUP, WM_SETTINGCHANGE, WM_WINDOWPOSCHANGING, WNDCLASSW, WS_EX_LAYERED,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use windows::core::{PCWSTR, w};
 
@@ -50,7 +50,7 @@ type Handler = Rc<Box<dyn Fn(WidgetEvent)>>;
 thread_local! {
     /// The live window, for the WinEvent hook (0 when none).
     static HWND_VALUE: Cell<isize> = const { Cell::new(0) };
-    /// Raised over the desktop during Show desktop (research R4): the bottom guard is off.
+    /// Raised while the desktop is the foreground window (research R4): the bottom guard is off.
     static RAISED: Cell<bool> = const { Cell::new(false) };
     static HANDLER: RefCell<Option<Handler>> = const { RefCell::new(None) };
 }
@@ -307,20 +307,16 @@ fn free_dib(dib: Option<Dib>) {
 
 // --- Show desktop (research R4) --------------------------------------------------------------
 
-/// Whether `hwnd` is the desktop brought to the front by Show desktop: a shell desktop window
-/// (`WorkerW` / `Progman`) that is topmost. A plain click on the desktop also makes it foreground,
-/// but not topmost, and must not raise the widget over other windows.
-fn is_shown_desktop(hwnd: HWND) -> bool {
+/// Whether `hwnd` is the desktop (`WorkerW` / `Progman`), made foreground by Show desktop, by
+/// minimizing every window, or by a click on it. Windows 11 24H2+ raises `Progman` on Show desktop
+/// without making it topmost, so any desktop activation raises the widget; it goes back down as
+/// soon as another window comes to the front.
+fn is_desktop(hwnd: HWND) -> bool {
     let mut name = [0u16; 16];
     // SAFETY: `name` is a valid buffer of the given length.
     let len = unsafe { GetClassNameW(hwnd, &mut name) };
     let class = String::from_utf16_lossy(&name[..len.max(0) as usize]);
-    if class != "WorkerW" && class != "Progman" {
-        return false;
-    }
-    // SAFETY: reading a style of any window is allowed.
-    let ex_style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } as u32;
-    ex_style & WS_EX_TOPMOST.0 != 0
+    class == "WorkerW" || class == "Progman"
 }
 
 unsafe extern "system" fn foreground_hook(
@@ -336,7 +332,7 @@ unsafe extern "system" fn foreground_hook(
     if hwnd.is_invalid() {
         return;
     }
-    let raise = is_shown_desktop(foreground);
+    let raise = is_desktop(foreground);
     if raise == RAISED.get() {
         return;
     }
@@ -345,7 +341,7 @@ unsafe extern "system" fn foreground_hook(
     // SAFETY: `hwnd` is our live window (cleared before it is destroyed).
     unsafe {
         if raise {
-            // Above the topmost desktop, until another window comes to the front.
+            // Over the desktop, until another window comes to the front.
             let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, flags);
         } else {
             let _ = SetWindowPos(hwnd, Some(HWND_NOTOPMOST), 0, 0, 0, 0, flags);

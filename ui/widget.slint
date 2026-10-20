@@ -1,5 +1,4 @@
-// The Desktop Widget (005 contracts/ui.md): five Metrics drawn straight over the wallpaper, no
-// card. Never shown as a window: the app renders it with `take_snapshot()` and presents the
+// The Desktop Widget (005 contracts/ui.md): five Metrics on a semi-transparent card. Never shown as a window: the app renders it with `take_snapshot()` and presents the
 // image on a layered window (research R1).
 import { MetricRowData } from "metric-row.slint";
 
@@ -9,8 +8,10 @@ global WidgetTheme {
 
     out property <color> text: dark ? #ffffff : #1b1b1b;
     out property <color> muted-text: dark ? #c8c8c8 : #424242;
-    // Behind every text and Sparkline, so they read on any wallpaper.
-    out property <color> halo: dark ? #000000b3 : #ffffffb3;
+    // The Panel's background and border at 75 %, so the wallpaper shows through but any
+    // wallpaper stays readable.
+    out property <color> card: dark ? #202020bf : #f9f9f9bf;
+    out property <color> card-border: dark ? #3a3a3abf : #e0e0e0bf;
     // The Panel's Warning Level colors for the same mode (theme.slint).
     out property <color> warning: dark ? #f5a623 : #b26b00;
     out property <color> critical: dark ? #e5484d : #c62828;
@@ -20,64 +21,33 @@ global WidgetTheme {
     }
 }
 
-// Text with a 1 px halo: four offset copies in the halo color drawn under the main copy.
-component HaloText inherits Rectangle {
-    in property <string> text;
-    in property <color> text-color: WidgetTheme.text;
-    in property <TextHorizontalAlignment> horizontal-alignment: left;
-    in property <length> font-size: 13px;
-    in property <int> font-weight: 400;
-
-    preferred-width: main.preferred-width;
-    preferred-height: main.preferred-height;
-
-    for offset in [{ x: -1px, y: 0px }, { x: 1px, y: 0px }, { x: 0px, y: -1px }, { x: 0px, y: 1px }]: Text {
-        x: offset.x;
-        y: offset.y;
-        width: parent.width;
-        height: parent.height;
-        text: root.text;
-        color: WidgetTheme.halo;
-        font-size: root.font-size;
-        font-weight: root.font-weight;
-        horizontal-alignment: root.horizontal-alignment;
-        vertical-alignment: center;
-        overflow: elide;
-    }
-
-    main := Text {
-        width: parent.width;
-        height: parent.height;
-        text: root.text;
-        color: root.text-color;
-        font-size: root.font-size;
-        font-weight: root.font-weight;
-        horizontal-alignment: root.horizontal-alignment;
-        vertical-alignment: center;
-        overflow: elide;
-    }
+component WidgetText inherits Text {
+    color: WidgetTheme.text;
+    font-size: 13px;
+    vertical-alignment: center;
+    overflow: elide;
 }
 
-// One Metric, laid out like the Panel's MetricRow (metric-row.slint) but with halos.
-component HaloMetricRow inherits HorizontalLayout {
+// One Metric, laid out like the Panel's MetricRow (metric-row.slint).
+component WidgetMetricRow inherits HorizontalLayout {
     in property <MetricRowData> data;
 
     spacing: 8px;
     height: 20px;
 
-    HaloText {
+    WidgetText {
         text: data.label;
         min-width: 80px;
     }
-    HaloText {
+    WidgetText {
         text: data.value-text;
-        text-color: data.unavailable ? WidgetTheme.muted-text : WidgetTheme.level-text(data.level);
+        color: data.unavailable ? WidgetTheme.muted-text : WidgetTheme.level-text(data.level);
         horizontal-alignment: right;
         horizontal-stretch: 1;
     }
-    HaloText {
+    WidgetText {
         text: data.secondary-text;
-        text-color: WidgetTheme.level-text(data.level);
+        color: WidgetTheme.level-text(data.level);
         horizontal-alignment: right;
         width: 36px;
     }
@@ -91,16 +61,6 @@ component HaloMetricRow inherits HorizontalLayout {
             viewbox-width: 60;
             viewbox-height: 20;
             commands: data.sparkline;
-            stroke: WidgetTheme.halo;
-            stroke-width: 3px;
-            fill: transparent;
-        }
-        Path {
-            width: 100%;
-            height: 100%;
-            viewbox-width: 60;
-            viewbox-height: 20;
-            commands: data.sparkline;
             stroke: WidgetTheme.level-text(data.level);
             stroke-width: 1.5px;
             fill: transparent;
@@ -108,8 +68,8 @@ component HaloMetricRow inherits HorizontalLayout {
     }
 }
 
-component SectionHeader inherits HaloText {
-    text-color: WidgetTheme.muted-text;
+component SectionHeader inherits WidgetText {
+    color: WidgetTheme.muted-text;
     font-size: 12px;
     font-weight: 600;
 }
@@ -136,32 +96,40 @@ export component WidgetWindow inherits Window {
     no-frame: true;
     width: 320px;
     height: widget-height;
-    // Alpha 1/255: invisible, but every pixel receives the mouse for dragging (research R2).
+    // Alpha 1/255 in the rounded corners: invisible, but every pixel receives the mouse for
+    // dragging (research R2).
     background: #00000001;
     default-font-size: 13px;
 
+    Rectangle {
+        background: WidgetTheme.card;
+        border-color: WidgetTheme.card-border;
+        border-width: 1px;
+        border-radius: 8px;
+    }
+
     content := VerticalLayout {
-        padding: 8px;
+        padding: 12px;
         spacing: 8px;
 
         VerticalLayout {
             spacing: 2px;
             SectionHeader { text: "CPU"; }
-            HaloMetricRow { data: root.cpu-usage; }
-            HaloMetricRow { data: root.cpu-temperature; }
+            WidgetMetricRow { data: root.cpu-usage; }
+            WidgetMetricRow { data: root.cpu-temperature; }
         }
 
         VerticalLayout {
             spacing: 2px;
             SectionHeader { text: "GPU"; }
-            HaloMetricRow { data: root.gpu-usage; }
-            HaloMetricRow { data: root.gpu-temperature; }
+            WidgetMetricRow { data: root.gpu-usage; }
+            WidgetMetricRow { data: root.gpu-temperature; }
         }
 
         VerticalLayout {
             spacing: 2px;
             SectionHeader { text: "Memory"; }
-            HaloMetricRow { data: root.memory-usage; }
+            WidgetMetricRow { data: root.memory-usage; }
         }
     }
 }

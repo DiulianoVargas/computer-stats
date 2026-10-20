@@ -144,9 +144,9 @@ Windows between light and dark mode; confirm it stays sharp, correctly sized and
   Widget MUST move fully onto a connected monitor.
 - **FR-009**: The Desktop Widget MUST render sharply at each monitor's scaling and re-scale when
   moved between monitors.
-- **FR-010**: The Desktop Widget MUST have a transparent background: its text and Sparklines
-  are drawn directly over the wallpaper, with no card behind them. They MUST stay readable over
-  light, dark and busy wallpapers. Its colors MUST follow Windows' light/dark mode, and Warning
+- **FR-010**: The Desktop Widget MUST have a semi-transparent card behind its text and
+  Sparklines (the Panel's background at 75 % opacity, rounded corners), so the wallpaper shows
+  through. They MUST stay readable over light, dark and busy wallpapers. Its colors MUST follow Windows' light/dark mode, and Warning
   Level colors still apply.
 - **FR-011**: The Desktop Widget MUST be observe-only: it MUST NOT show App Volumes or the
   Processes View, and MUST NOT offer End App.
@@ -157,12 +157,12 @@ Windows between light and dark mode; confirm it stays sharp, correctly sized and
 - **FR-014**: The Desktop Widget MUST stay visible when the user uses "Show desktop" (Win+D or the
   far right of the taskbar). Where Windows does not allow that, it MUST fall back to hiding with
   the other windows and reappearing when they are restored, without errors or a lost position.
-- **FR-015**: The whole rectangle of the Desktop Widget, transparent parts included, MUST respond
+- **FR-015**: The whole rectangle of the Desktop Widget, transparent corners included, MUST respond
   to dragging.
 
 ### Key Entities
 
-- **Desktop Widget**: The optional, transparent card on the desktop showing a compact set of
+- **Desktop Widget**: The optional, semi-transparent card on the desktop showing a compact set of
   Metrics. Attributes: on/off,
   position (monitor and point on it). Observe-only; not a View of the Panel.
 - **Widget Settings**: The remembered on/off state and position, kept on this PC for the current
@@ -197,7 +197,7 @@ Windows between light and dark mode; confirm it stays sharp, correctly sized and
   Windows does not allow that, it hides with the other windows and comes back with them.
 - Q: Which Metrics does it show? → A: A fixed, compact set: CPU Usage and Temperature, GPU Usage
   and Temperature, and Memory Usage. VRAM and Disk Space are left out.
-- Q: Background style? → A: Transparent, with text and Sparklines drawn over the wallpaper.
+- Q: Background style? → A: Transparent, with text and Sparklines drawn over the wallpaper. Revised 2026-10-20 after trying it: a semi-transparent card (75 %), since the transparent version read poorly.
 
 ## Assumptions
 
