@@ -172,12 +172,12 @@ uncheck → no longer starts (quickstart Q8).
 
 **Purpose**: Single instance, theme/DPI changes, budgets and final validation.
 
-- [ ] T055 [P] Create `src/platform/instance.rs`: named mutex `Local\ComputerStats.SingleInstance`; if it already exists, find the window of class `ComputerStats.Tray`, post the registered message `ComputerStats.OpenPanel` and return `AlreadyRunning`; the running instance calls `ChangeWindowMessageFilterEx(MSGFLT_ALLOW)` for that message and `tray.rs` maps it to `TrayEvent::OpenPanel`; `src/main.rs` checks it before creating any window and exits with code 0, and `src/ui.rs` opens (not toggles) the Panel on `OpenPanel` (FR-023, research R6)
-- [ ] T056 Handle theme and DPI changes in `src/platform/tray.rs` + `src/ui.rs`: on `WM_SETTINGCHANGE` with `"ImmersiveColorSet"` re-read `taskbar_uses_light_theme()` and on `WM_DPICHANGED`/`WM_DISPLAYCHANGE` re-read the icon size; re-render the Tray Icon (FR-025, research R3)
-- [ ] T057 Run quality gates and fix findings: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo deny check`, `cargo test`; grep that `unsafe` appears only under `src/platform/` and that no `unwrap(`/`expect(` exist outside `#[cfg(test)]`
-- [ ] T058 Run `scripts/measure.ps1 -Minutes 10` with the Panel closed and `-PanelOpen` with it open, and start a 24 h run for SC-003; record results and exe size in `specs/002-tray-metrics-panel/measurements.md` (Constitution I; SC-002, SC-003; quickstart Q14)
+- [X] T055 [P] Create `src/platform/instance.rs`: named mutex `Local\ComputerStats.SingleInstance`; if it already exists, find the window of class `ComputerStats.Tray`, post the registered message `ComputerStats.OpenPanel` and return `AlreadyRunning`; the running instance calls `ChangeWindowMessageFilterEx(MSGFLT_ALLOW)` for that message and `tray.rs` maps it to `TrayEvent::OpenPanel`; `src/main.rs` checks it before creating any window and exits with code 0, and `src/ui.rs` opens (not toggles) the Panel on `OpenPanel` (FR-023, research R6)
+- [X] T056 Handle theme and DPI changes in `src/platform/tray.rs` + `src/ui.rs`: on `WM_SETTINGCHANGE` with `"ImmersiveColorSet"` re-read `taskbar_uses_light_theme()` and on `WM_DPICHANGED`/`WM_DISPLAYCHANGE` re-read the icon size; re-render the Tray Icon (FR-025, research R3)
+- [X] T057 Run quality gates and fix findings: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo deny check`, `cargo test`; grep that `unsafe` appears only under `src/platform/` and that no `unwrap(`/`expect(` exist outside `#[cfg(test)]`
+- [X] T058 Run `scripts/measure.ps1 -Minutes 10` with the Panel closed and `-PanelOpen` with it open, and start a 24 h run for SC-003; record results and exe size in `specs/002-tray-metrics-panel/measurements.md` (Constitution I; SC-002, SC-003; quickstart Q14)
 - [ ] T059 Validate the remaining scenarios quickstart Q10 (second launch), Q11 (Explorer restart) and Q13 (light/dark theme), then re-run Q1–Q9, Q12 and Q15 as a regression pass; record outcomes in `specs/002-tray-metrics-panel/measurements.md`
-- [ ] T060 [P] Update `README.md` (features, prerequisites, how to enable Start with Windows) and confirm no new domain term was introduced in code without being added to `CONTEXT.md` (Constitution IX)
+- [X] T060 [P] Update `README.md` (features, prerequisites, how to enable Start with Windows) and confirm no new domain term was introduced in code without being added to `CONTEXT.md` (Constitution IX)
 
 ---
 

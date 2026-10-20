@@ -4,6 +4,7 @@
 pub mod cpu;
 pub mod drives;
 pub mod gpu;
+pub mod instance;
 pub mod memory;
 pub mod pawnio;
 pub mod shell;

@@ -67,3 +67,25 @@ vs the `GPU Engine` counters' 1.1 % (nvidia-smi reports 10 %: a different defini
 - Pending user check: the Status Dot on the Tray Icon and its tooltip; the Sparkline gap after
   sleep/resume.
 - Panel compacted after user feedback: 340 × 320 → 320 × 270 logical px with the same content.
+
+## T058: Release budgets, all user stories (2026-10-20)
+
+Release build, not elevated (PawnIO not loaded; spike 001 measured it at ≈ 7 MB, so ≈ 10.5 MB is
+expected elevated). Exe **8.28 MiB** (budget 10 MB).
+
+| Scenario | Private memory (max) | CPU (mean) | Growth | Budget |
+|----------|----------------------|------------|--------|--------|
+| Panel closed, 3 min | 3.6 MB | 0.04 % | +0.7 MB (warm-up from 2.7 MB) | ≤ 30 MB, < 0.5 % |
+| Panel open, 20 s (verified open throughout) | 3.5 MB | 0.03 % | −0.1 MB | ≤ 45 MB, < 2 % |
+
+Longer Panel-open runs were cut short by focus changes on the desktop (the Panel correctly closes
+when another window is activated). Pending, to run by the user from an elevated terminal: the
+same measurement elevated, and the 24 h run for SC-003.
+
+## Polish checks (2026-10-20)
+
+- Q10 single instance: a second launch exited with code 0 and the first instance's Panel opened
+  in the foreground.
+- Gates: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo deny check`,
+  `cargo test` (65 tests) pass; `unsafe` appears only under `src/platform/`; no `unwrap`/`expect`
+  outside tests; the only spawned process is System32's `schtasks.exe`.

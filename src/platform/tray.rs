@@ -26,7 +26,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DefWindowProcW, DestroyIcon, DestroyMenu, DestroyWindow, HICON, ICONINFO, MF_CHECKED,
     MF_SEPARATOR, MF_STRING, MSGFLT_ALLOW, PostMessageW, RegisterClassW, RegisterWindowMessageW,
     SM_CXSMICON, SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON,
-    TrackPopupMenuEx, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_NULL, WNDCLASSW, WS_OVERLAPPED,
+    TrackPopupMenuEx, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_DISPLAYCHANGE, WM_DPICHANGED,
+    WM_NULL, WM_SETTINGCHANGE, WNDCLASSW, WS_OVERLAPPED,
 };
 use windows::core::{GUID, PCWSTR, w};
 
@@ -37,6 +38,10 @@ pub enum TrayEvent {
     Select,
     /// Right click, Shift+F10 or the Menu key; screen coordinates for the Tray Menu.
     ContextMenu { x: i32, y: i32 },
+    /// A second launch asked this instance to open its Panel (FR-023).
+    OpenPanel,
+    /// Theme, DPI or display settings changed: the icon may need redrawing (FR-025).
+    AppearanceChanged,
 }
 
 pub const WINDOW_CLASS: PCWSTR = w!("ComputerStats.Tray");
@@ -63,6 +68,7 @@ struct State {
     icon: Option<HICON>,
     tooltip: String,
     taskbar_created: u32,
+    open_panel: u32,
     handler: std::rc::Rc<Handler>,
 }
 
@@ -112,7 +118,13 @@ impl TrayIcon {
         // SAFETY: the string is a valid NUL-terminated literal.
         let taskbar_created = unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) };
         // We run elevated; Explorer does not. Without this, UIPI drops its messages (FR-024).
-        for msg in [taskbar_created, CALLBACK_MESSAGE, WM_CONTEXTMENU] {
+        let open_panel = super::instance::open_panel_message();
+        for msg in [
+            taskbar_created,
+            open_panel,
+            CALLBACK_MESSAGE,
+            WM_CONTEXTMENU,
+        ] {
             // SAFETY: `hwnd` is our live window.
             let _ = unsafe { ChangeWindowMessageFilterEx(hwnd, msg, MSGFLT_ALLOW, None) };
         }
@@ -127,6 +139,7 @@ impl TrayIcon {
                 icon: None,
                 tooltip: crate::snapshot::APP_NAME.to_string(),
                 taskbar_created,
+                open_panel,
                 handler: std::rc::Rc::new(Box::new(on_event)),
             })
         });
@@ -402,10 +415,19 @@ unsafe extern "system" fn wnd_proc(
         }
         return LRESULT(0);
     }
-    let taskbar_created = STATE.with_borrow(|s| s.as_ref().map(|s| s.taskbar_created));
-    if taskbar_created == Some(msg) && msg != 0 {
-        add_icon();
-        return LRESULT(0);
+    let registered = STATE.with_borrow(|s| s.as_ref().map(|s| (s.taskbar_created, s.open_panel)));
+    if let Some((taskbar_created, open_panel)) = registered {
+        if msg == taskbar_created && msg != 0 {
+            add_icon();
+            return LRESULT(0);
+        }
+        if msg == open_panel && msg != 0 {
+            dispatch(TrayEvent::OpenPanel);
+            return LRESULT(0);
+        }
+    }
+    if matches!(msg, WM_SETTINGCHANGE | WM_DISPLAYCHANGE | WM_DPICHANGED) {
+        dispatch(TrayEvent::AppearanceChanged);
     }
     // SAFETY: forwarding the unchanged message to the default procedure.
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }

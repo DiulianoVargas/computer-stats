@@ -15,6 +15,7 @@ use crate::domain::sparkline;
 use crate::domain::tray_art::{self, TrayTheme};
 use crate::domain::warning::WarningLevel;
 use crate::generated::{DriveRowData, MetricRowData, PanelWindow};
+use crate::platform::instance::{self, Instance};
 use crate::platform::shell;
 use crate::platform::theme;
 use crate::platform::tray::{self, MenuEntry, TrayEvent, TrayIcon};
@@ -58,6 +59,12 @@ fn with_app<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
 
 /// Runs the app until Quit.
 pub fn run() -> Result<(), String> {
+    // A second launch opens the running instance's Panel and exits (FR-023).
+    let _instance = match instance::acquire() {
+        Instance::First(guard) => guard,
+        Instance::AlreadyRunning => return Ok(()),
+    };
+
     let tray = TrayIcon::create(on_tray_event)?;
     let icon = (WarningLevel::Normal, tray_theme(), tray.icon_size());
     tray.set_icon(&tray_art::render(icon.2, icon.1, icon.0), icon.2);
@@ -137,6 +144,19 @@ fn on_tray_event(event: TrayEvent) {
     match event {
         TrayEvent::Select => {
             with_app(|app| app.toggle());
+        }
+        TrayEvent::OpenPanel => {
+            with_app(|app| {
+                if !app.visible {
+                    app.open();
+                }
+            });
+        }
+        TrayEvent::AppearanceChanged => {
+            with_app(|app| {
+                let wanted = (app.icon.0, tray_theme(), app.tray.icon_size());
+                app.update_icon_to(wanted);
+            });
         }
         TrayEvent::ContextMenu { x, y } => {
             let checked = with_app(|app| app.start_with_windows).unwrap_or(false);
@@ -241,6 +261,11 @@ impl App {
     /// Redraws the Tray Icon only when the Status Dot changes (FR-017, SC-005).
     fn update_icon(&mut self) {
         let wanted = (self.latest.status_dot.level, self.icon.1, self.icon.2);
+        self.update_icon_to(wanted);
+    }
+
+    /// Redraws only when the level, taskbar theme or icon size differs from what is shown.
+    fn update_icon_to(&mut self, wanted: (WarningLevel, TrayTheme, u32)) {
         if wanted != self.icon {
             self.tray
                 .set_icon(&tray_art::render(wanted.2, wanted.1, wanted.0), wanted.2);
