@@ -126,6 +126,14 @@ pub fn run() -> Result<(), String> {
             with_app(|app| app.processes.expire());
         });
     });
+    // Re-anchor as soon as the height changes, not at the next Snapshot (no visible jump).
+    panel.on_panel_height_changed(|| {
+        with_app(|app| {
+            if app.visible {
+                app.place_if_resized();
+            }
+        });
+    });
     panel.on_background_clicked(|| {
         with_app(|app| app.processes.cancel_arming());
     });

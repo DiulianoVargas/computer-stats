@@ -57,6 +57,12 @@ export component PanelWindow inherits Window {
     callback sort-clicked(int);
     callback end-clicked(string);
     callback background-clicked();
+    // The Panel's height changed (View switch, Drives added or removed): the app re-anchors it.
+    callback panel-height-changed();
+
+    changed panel-height => {
+        root.panel-height-changed();
+    }
 
     property <length> tabs-height: 22px;
     // The Processes View's Panel height is fixed (contracts/ui.md).
@@ -130,31 +136,39 @@ export component PanelWindow inherits Window {
                     }
                 }
 
-                if root.view == 0: MetricsView {
-                    cpu-usage: root.cpu-usage;
-                    cpu-temperature: root.cpu-temperature;
-                    gpu-usage: root.gpu-usage;
-                    gpu-temperature: root.gpu-temperature;
-                    vram: root.vram;
-                    memory-usage: root.memory-usage;
-                    drives: root.drives;
-                }
+                // Both Views always exist, so the Panel's height is right the moment the View
+                // changes; only the shown one takes space.
+                VerticalLayout {
+                    spacing: 0;
 
-                processes := ProcessesView {
-                    visible: root.view == 1;
-                    // The rest of the fixed-height Panel; nothing while hidden.
-                    height: root.view == 1 ? root.processes-height - 2 * Theme.padding - root.tabs-height - Theme.section-gap : 0px;
-                    apps: root.apps;
-                    sort: root.sort;
-                    loading: root.apps-loading;
-                    sort-clicked(column) => {
-                        root.sort-clicked(column);
+                    MetricsView {
+                        visible: root.view == 0;
+                        height: root.view == 0 ? self.preferred-height : 0px;
+                        cpu-usage: root.cpu-usage;
+                        cpu-temperature: root.cpu-temperature;
+                        gpu-usage: root.gpu-usage;
+                        gpu-temperature: root.gpu-temperature;
+                        vram: root.vram;
+                        memory-usage: root.memory-usage;
+                        drives: root.drives;
                     }
-                    end-clicked(key) => {
-                        root.end-clicked(key);
-                    }
-                    background-clicked => {
-                        root.background-clicked();
+
+                    processes := ProcessesView {
+                        visible: root.view == 1;
+                        // The rest of the fixed-height Panel; nothing while hidden.
+                        height: root.view == 1 ? root.processes-height - 2 * Theme.padding - root.tabs-height - Theme.section-gap : 0px;
+                        apps: root.apps;
+                        sort: root.sort;
+                        loading: root.apps-loading;
+                        sort-clicked(column) => {
+                            root.sort-clicked(column);
+                        }
+                        end-clicked(key) => {
+                            root.end-clicked(key);
+                        }
+                        background-clicked => {
+                            root.background-clicked();
+                        }
                     }
                 }
             }
