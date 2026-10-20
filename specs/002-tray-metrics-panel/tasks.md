@@ -258,5 +258,5 @@ Task: "T032 Create src/platform/shell.rs"
 ## Notes
 
 - [P] tasks touch different files and do not depend on incomplete tasks.
-- No git repository exists yet; initialize one before implementation if commits per task are wanted.
+- Work happens on branch `002-tray-metrics-panel`; commit after each task or phase checkpoint.
 - Stop at any checkpoint to validate a story on its own.
