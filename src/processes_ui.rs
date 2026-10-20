@@ -176,6 +176,13 @@ impl ProcessesUi {
             memory_text: format::memory(app.private_bytes).into(),
             icon: icon.cloned().unwrap_or_default(),
             has_icon: icon.is_some(),
+            initial: app
+                .name
+                .chars()
+                .find(|c| c.is_alphanumeric())
+                .map(|c| c.to_uppercase().collect::<String>())
+                .unwrap_or_default()
+                .into(),
             armed: self.confirm.armed() == Some(app.key.as_str()),
             ending: self.ending.contains_key(&app.key),
             message: self
