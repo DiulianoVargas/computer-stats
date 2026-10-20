@@ -68,7 +68,7 @@ pub enum Reason {
     NotReported,
     /// The motherboard's monitoring chip is not one the app knows (006 research R3).
     UnsupportedMotherboard,
-    /// The firmware locked the monitoring chip against reads; the app never unlocks it (006 R4).
+    /// The firmware locked the monitoring chip against reads and clearing the lock failed (006 R4).
     LockedByFirmware,
 }
 

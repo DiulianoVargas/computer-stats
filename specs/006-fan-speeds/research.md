@@ -61,6 +61,12 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
 
 ## R4. The firmware lock (decision by the user)
 
+- **Revised 2026-10-20 (after 0.4.0)**: the user asked for the app to read the fans "like iCUE",
+  clearing the lock. Detection now clears bit 4 of register `0x28` of the hardware monitor device
+  when it is set (read-modify-write, no other bit touched), then reads it back; still set →
+  `— locked by firmware`. If every fan byte reads `0xFF` later (lock set again, e.g. after sleep),
+  the next tick re-runs detection, which clears it again. The original decision follows.
+
 - **Context**: Nuvoton NCT679x/6701D have an "I/O space lock" bit; ASUS firmware sets it. HWiNFO
   and LibreHardwareMonitor clear it before reading. It gates only I/O-port access to the
   sensors, has no effect on fan control and resets on reboot.

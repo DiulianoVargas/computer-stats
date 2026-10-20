@@ -55,8 +55,9 @@ reading for the same fan over 1 minute, and the value rises when the CPU is put 
    Panel, **Then** the Fans section shows the same reason as CPU Temperature (`— driver not
    found`, `— not elevated`).
 6. **Given** the motherboard's firmware has locked the monitoring chip against reads (as on the
-   developer's ASUS board), **When** the user opens the Panel, **Then** the Fans section shows
-   `— locked by firmware`, and the fans appear without a restart if another tool unlocks it.
+   developer's ASUS board), **When** the app starts, **Then** it clears that read lock, as HWiNFO,
+   iCUE and LibreHardwareMonitor do, and the fans are shown. Only if the lock cannot be cleared
+   does the Fans section show `— locked by firmware`.
 
 ---
 
@@ -146,10 +147,12 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
   motherboard` when the board's monitoring chip is not recognised and `— locked by firmware` when
   the firmware has locked the chip against reads.
 - **FR-006**: The app MUST only read fan speeds. It MUST NOT change fan speeds, fan curves or any
-  setting of the monitoring chip, including the firmware's read lock: a locked chip gives
-  `— locked by firmware`. The only writes allowed are the chip's access protocol (entering and
-  leaving configuration mode, and selecting the device, bank and register to read), which every
-  monitoring tool performs and which change no setting.
+  setting of the monitoring chip, with one exception: the firmware's I/O space read lock, which
+  it clears when set (revised 2026-10-20, see Clarifications). The lock gates only reads of the
+  sensors, affects no fan behaviour and is set again by the firmware on the next boot. The other
+  writes allowed are the chip's access protocol (entering and leaving configuration mode, and
+  selecting the device, bank and register to read). If the lock is still set after clearing it,
+  the Fans section shows `— locked by firmware`.
 - **FR-007**: Fans MUST always have the Normal Warning Level and MUST NOT affect the Status Dot.
 - **FR-008**: A failure to read fans MUST NOT affect any other Metric, and a failure of the GPU
   Fan MUST NOT affect the motherboard fans or the other GPU Metrics.
@@ -182,8 +185,7 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
 
 - **SC-001**: On a PC with an unlocked supported chip, every fan HWiNFO lists under the
   motherboard appears in the Panel, and each reading agrees with HWiNFO within 5 % over 1 minute
-  idle and 1 minute under load. On the developer's PC the Fans section shows
-  `— locked by firmware`.
+  idle and 1 minute under load, the developer's PC included.
 - **SC-002**: When a GPU driver reports fan speed, GPU Fan agrees with HWiNFO within 5 % over the
   same minutes.
 - **SC-003**: A fan that stops while the app runs shows `0 RPM` within 2 seconds.
@@ -201,8 +203,8 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
   found on current ASUS, MSI and Gigabyte desktop boards; others give `— unsupported motherboard`
   until added.
 - Spike S1 (2026-10-20): the developer's board has a Nuvoton NCT6701D whose firmware sets the
-  read lock, so its fans show `— locked by firmware`. Motherboard fan reading is validated on a
-  PC whose chip is not locked.
+  read lock. Since the revision of FR-006 the app clears it, so the fans are validated on the
+  developer's PC.
 - Spike S2 (2026-10-20): the Windows graphics statistics report the developer's GTX 1660 SUPER fan
   (830 RPM at idle); the integrated Radeon reports 0.
 - The system-wide lock used by monitoring tools for the chip is the shared "ISA bus" mutex used by
@@ -222,3 +224,6 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
 - Q: The developer's chip is locked by the firmware; may the app clear the lock to read the fans,
   as HWiNFO and LibreHardwareMonitor do? → A: No. The app never changes a chip setting; a locked
   chip shows `— locked by firmware` (FR-005, FR-006).
+- Q (revisited 2026-10-20, after 0.4.0): should the app clear the firmware's read lock after all,
+  as iCUE does? → A: Yes. The user reversed the earlier answer: the app clears only the I/O space
+  lock bit, never any other chip setting (FR-006).

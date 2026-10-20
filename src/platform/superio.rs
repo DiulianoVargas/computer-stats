@@ -1,6 +1,7 @@
 //! Motherboard Fan Speeds from the Nuvoton Super I/O chip through PawnIO's `LpcIO.bin` module
 //! (006 research R2–R5). Read-only: the only writes are the chip's access protocol (configuration
-//! mode, device / bank / register select). The firmware's read lock is never cleared (FR-006).
+//! mode, device / bank / register select) and clearing the firmware's I/O space read lock, as
+//! HWiNFO and iCUE do (FR-006, revised). No fan, curve or voltage register is ever written.
 
 use std::ffi::c_void;
 use std::time::{Duration, Instant};
@@ -16,7 +17,7 @@ use crate::domain::metric::Reason;
 
 /// How long a tick may wait for another monitoring tool to release the chip (research R5).
 const MUTEX_WAIT_MS: u32 = 10;
-/// How often a locked chip is checked again (research R4).
+/// How often a chip that stays locked (or unsupported) is checked again (research R4).
 const LOCK_RECHECK: Duration = Duration::from_secs(60);
 
 // Super I/O configuration registers (Nuvoton).
@@ -100,13 +101,14 @@ impl FanSource {
             return Ok(vec![FanSample::Invalid; chip.channels.len()]);
         };
         let raw = self.read_counts(base, chip)?;
-        // Every byte 0xFF: the firmware locked the chip again (e.g. after sleep).
+        // Every byte 0xFF: the firmware locked the chip again (e.g. after sleep). This second is a
+        // gap; the next tick re-runs detection, which clears the lock again.
         if raw.iter().all(|&(high, low)| high == 0xFF && low == 0xFF) && self.is_locked(port)? {
             self.state = State::Retry {
-                at: Instant::now() + LOCK_RECHECK,
+                at: Instant::now(),
                 reason: Reason::LockedByFirmware,
             };
-            return Err(Reason::LockedByFirmware);
+            return Ok(vec![FanSample::Invalid; chip.channels.len()]);
         }
         Ok(raw
             .into_iter()
@@ -171,8 +173,8 @@ impl FanSource {
         Ok(Detection::Unsupported)
     }
 
-    /// Inside configuration mode: the chip, its hardware monitor base and lock state; `None` when
-    /// this port has no supported chip.
+    /// Inside configuration mode: the chip and its hardware monitor base, clearing the read lock if
+    /// the firmware set it; `None` when this port has no supported chip.
     fn identify(&self, port: u16) -> Result<Option<Detection>, Reason> {
         let id = self.config_in(CHIP_ID)?;
         let revision = self.config_in(CHIP_REVISION)?;
@@ -189,8 +191,14 @@ impl FanSource {
             // Disabled or relocated by the firmware; enabling it would be a setting change.
             return Ok(Some(Detection::Unsupported));
         }
-        if self.config_in(IO_SPACE_LOCK)? & IO_SPACE_LOCKED != 0 {
-            return Ok(Some(Detection::Locked));
+        let lock = self.config_in(IO_SPACE_LOCK)?;
+        if lock & IO_SPACE_LOCKED != 0 {
+            // The one setting the app changes (FR-006, revised; the user's decision): only this
+            // bit, read-modify-write. The firmware sets it again on the next boot.
+            self.config_out(IO_SPACE_LOCK, lock & !IO_SPACE_LOCKED)?;
+            if self.config_in(IO_SPACE_LOCK)? & IO_SPACE_LOCKED != 0 {
+                return Ok(Some(Detection::Locked));
+            }
         }
         Ok(Some(Detection::Ready { port, base, chip }))
     }

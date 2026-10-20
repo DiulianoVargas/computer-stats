@@ -6,7 +6,7 @@
   `target\package\modules-extract\` for a dev build).
 - `cargo build --release`; run `target\release\computer-stats.exe` (elevated by its manifest).
 - HWiNFO (sensors-only mode) as the reference for RPM readings.
-- F4–F6 need a PC whose Nuvoton chip is not locked by its firmware (not the developer's PC).
+- F4–F6 need a supported chip; since the FR-006 revision the developer's PC qualifies (the app clears its lock).
 
 ## Automated
 
@@ -43,9 +43,10 @@ cargo run --example fan_spike -- target\package\modules-extract\LpcIO.bin
 
 | # | Result | Notes |
 |---|--------|-------|
-| F1 | Pass (2026-10-20) | Release exe, elevated: GPU Fan `829 RPM` (spike S2: 830 RPM); Fans `— locked by firmware`. Not yet compared with HWiNFO side by side |
+| F1 | Pass (2026-10-20) | Release exe, elevated: GPU Fan `829 RPM` (spike S2: 830 RPM); Fans `— locked by firmware` (0.4.0, before the FR-006 revision) |
 | F2 | Pending | Needs a GPU load next to HWiNFO |
 | F3 | Pass | Widget grew 206 → 214 px: one Fan row in the GPU group, none in the CPU group; checked on screen by the user |
-| F4–F6 | Pending | Need a PC with an unlocked Nuvoton chip |
+| F4 | Pass in part (after FR-006 revision) | Developer's PC, lock cleared by the app: two Fans shown, about 700 and 3200 RPM. Not yet compared with HWiNFO; header names not yet mapped |
+| F5–F6 | Pending | |
 | F7–F9 | Pending | Each reason is covered by unit tests (`metric::Reason`, `domain::fan`); manual runs pending |
 | F10 | See [measurements.md](measurements.md) | |
