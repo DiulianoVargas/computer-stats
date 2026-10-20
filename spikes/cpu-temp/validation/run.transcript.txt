@@ -1,0 +1,28 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261019233023
+Username: DIULI\Diuli
+RunAs User: DIULI\Diuli
+Configuration Name: 
+Machine: DIULI (Microsoft Windows NT 10.0.26300.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\Diuli\Documents\computer-stats\spikes\cpu-temp\validation\run-v5-v6.ps1 -LhmDir C:\Users\Diuli\AppData\Local\Temp\lhm\bin
+Process ID: 38440
+PSVersion: 5.1.26100.9711
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9711
+BuildVersion: 10.0.26100.9711
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Reference: AMD Ryzen 9 7900 / Core (Tctl/Tdie)
+V5 idle: settling 10 s, recording 60 s
+idle : 61 reference samples
+V6 load: 24 busy-loop workers, recording 90 s
+load : 91 reference samples
+Done.
+**********************
+Windows PowerShell transcript end
+End time: 20261019233305
+**********************

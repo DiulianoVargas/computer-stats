@@ -1,0 +1,20 @@
+# Constitution II (native only), IV (no network), VI (dependency discipline).
+
+[bans]
+multiple-versions = "warn"
+deny = [
+    # II. Native only: no web views
+    { name = "wry" },
+    { name = "webview2-com" },
+    { name = "tauri" },
+    # IV. Elevated minimal surface: no network
+    { name = "reqwest" },
+    { name = "hyper" },
+    { name = "ureq" },
+]
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "Unicode-3.0"]
+private = { ignore = true }
+
+[advisories]
