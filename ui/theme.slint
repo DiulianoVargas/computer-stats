@@ -11,10 +11,23 @@ export global Theme {
     out property <brush> section-text: dark ? #c8c8c8 : #424242;
     out property <brush> accent-bar: dark ? #60cdff : #005fb8;
     out property <brush> bar-track: dark ? #3d3d3d : #e5e5e5;
+    // Warning Levels (FR-016), each ≥ 4.5:1 on the Panel background.
+    out property <brush> warning: dark ? #f5a623 : #b26b00;
+    out property <brush> critical: dark ? #e5484d : #c62828;
 
-    out property <length> padding: 16px;
-    out property <length> section-gap: 12px;
-    out property <length> row-gap: 4px;
+    // Text color for a Warning Level: 0 Normal (or none), 1 Warning, 2 Critical.
+    public pure function level-text(level: int) -> brush {
+        level == 2 ? critical : level == 1 ? warning : text
+    }
+
+    // Drive bar color for a Warning Level.
+    public pure function level-bar(level: int) -> brush {
+        level == 2 ? critical : level == 1 ? warning : accent-bar
+    }
+
+    out property <length> padding: 12px;
+    out property <length> section-gap: 8px;
+    out property <length> row-gap: 2px;
     out property <length> font-size: 13px;
     out property <length> section-font-size: 12px;
 }

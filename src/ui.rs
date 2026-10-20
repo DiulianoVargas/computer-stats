@@ -11,7 +11,9 @@ use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 use crate::domain::anchor::{self, Size};
 use crate::domain::format;
 use crate::domain::metric::{MetricKind, Reading, Reason};
+use crate::domain::sparkline;
 use crate::domain::tray_art::{self, TrayTheme};
+use crate::domain::warning::WarningLevel;
 use crate::generated::{DriveRowData, MetricRowData, PanelWindow};
 use crate::platform::shell;
 use crate::platform::theme;
@@ -25,12 +27,17 @@ const TOGGLE_GUARD: Duration = Duration::from_millis(300);
 
 const MENU_QUIT: u32 = 1;
 
+/// Logical width, as in `ui/panel.slint`.
+const PANEL_WIDTH: f32 = 320.0;
+
 /// Everything the UI thread owns. Lives in a thread-local so callbacks queued from other threads
 /// (`invoke_from_event_loop` requires `Send`) can reach it.
 struct App {
     panel: PanelWindow,
     tray: TrayIcon,
     latest: Snapshot,
+    /// What the Tray Icon currently shows, so it is redrawn only on change.
+    icon: (WarningLevel, TrayTheme, u32),
     visible: bool,
     hidden_by_deactivation: Option<Instant>,
     /// Logical height the Panel was last positioned for.
@@ -48,9 +55,8 @@ fn with_app<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
 /// Runs the app until Quit.
 pub fn run() -> Result<(), String> {
     let tray = TrayIcon::create(on_tray_event)?;
-    let theme = tray_theme();
-    let size = tray.icon_size();
-    tray.set_icon(&tray_art::render(size, theme), size);
+    let icon = (WarningLevel::Normal, tray_theme(), tray.icon_size());
+    tray.set_icon(&tray_art::render(icon.2, icon.1, icon.0), icon.2);
 
     // Owned by the hidden tray window: no taskbar button and not in Alt+Tab (FR-001).
     let owner = tray.hwnd();
@@ -89,6 +95,7 @@ pub fn run() -> Result<(), String> {
             panel,
             tray,
             latest: Snapshot::unavailable(Reason::ReadFailed),
+            icon,
             visible: false,
             hidden_by_deactivation: None,
             placed_height: 0.0,
@@ -112,6 +119,7 @@ fn on_snapshot(snapshot: Snapshot) {
     with_app(|app| {
         app.tray.set_tooltip(&snapshot.tooltip);
         app.latest = snapshot;
+        app.update_icon();
         // Panel properties change only while it is visible (Constitution I).
         if app.visible {
             app.push_snapshot();
@@ -186,7 +194,7 @@ impl App {
         let icon = self.tray.rect().unwrap_or_else(shell::cursor_rect);
         let scale = shell::scale_for(icon);
         let size = Size {
-            width: (340.0 * scale).round() as i32,
+            width: (PANEL_WIDTH * scale).round() as i32,
             height: (height * scale).round() as i32,
         };
         if let Some(work_area) = shell::work_area_for(icon) {
@@ -201,6 +209,16 @@ impl App {
     fn place_if_resized(&mut self) {
         if self.panel.get_panel_height() != self.placed_height {
             self.place();
+        }
+    }
+
+    /// Redraws the Tray Icon only when the Status Dot changes (FR-017, SC-005).
+    fn update_icon(&mut self) {
+        let wanted = (self.latest.status_dot.level, self.icon.1, self.icon.2);
+        if wanted != self.icon {
+            self.tray
+                .set_icon(&tray_art::render(wanted.2, wanted.1, wanted.0), wanted.2);
+            self.icon = wanted;
         }
     }
 
@@ -252,23 +270,39 @@ fn metric_row(state: &MetricState) -> MetricRowData {
         value_text: value.into(),
         secondary_text: secondary.into(),
         unavailable,
+        level: level_index(state.level),
+        sparkline: {
+            let (min, max) = sparkline::scale(state.kind);
+            sparkline::path(&state.history, min, max).into()
+        },
     }
 }
 
 fn drive_row(state: &DriveState) -> DriveRowData {
     match state {
-        DriveState::Ready(drive) => DriveRowData {
+        DriveState::Ready { drive, level } => DriveRowData {
             label_text: format::drive_label(drive.letter, &drive.label).into(),
             free_text: format::drive_free(drive.free_bytes, drive.total_bytes).into(),
             used_fraction: drive.used_pct() / 100.0,
             unavailable: false,
+            level: level_index(Some(*level)),
         },
         DriveState::Unavailable { letter, reason } => DriveRowData {
             label_text: SharedString::from(format!("{letter}:")),
             free_text: format::unavailable(*reason).into(),
             used_fraction: 0.0,
             unavailable: true,
+            level: 0,
         },
+    }
+}
+
+/// The `level` int the Slint rows expect.
+fn level_index(level: Option<WarningLevel>) -> i32 {
+    match level {
+        Some(WarningLevel::Critical) => 2,
+        Some(WarningLevel::Warning) => 1,
+        _ => 0,
     }
 }
 

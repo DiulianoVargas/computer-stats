@@ -1,5 +1,6 @@
 // One Metric: label, value, optional secondary value (%), Sparkline slot (contracts/ui.md Rows).
 import { Theme } from "theme.slint";
+import { Sparkline } from "sparkline.slint";
 
 export struct MetricRowData {
     label: string,
@@ -8,23 +9,27 @@ export struct MetricRowData {
     // "18 %" for VRAM and Memory Usage; empty otherwise.
     secondary-text: string,
     unavailable: bool,
+    // Warning Level: 0 Normal (or none), 1 Warning, 2 Critical.
+    level: int,
+    // Path commands for the Sparkline; empty before the first sample.
+    sparkline: string,
 }
 
 export component MetricRow inherits HorizontalLayout {
     in property <MetricRowData> data;
 
     spacing: 8px;
-    height: 22px;
+    height: 20px;
 
     Text {
         text: data.label;
         color: Theme.text;
         vertical-alignment: center;
-        min-width: 84px;
+        min-width: 80px;
     }
     Text {
         text: data.value-text;
-        color: data.unavailable ? Theme.muted-text : Theme.text;
+        color: data.unavailable ? Theme.muted-text : Theme.level-text(data.level);
         horizontal-alignment: right;
         vertical-alignment: center;
         horizontal-stretch: 1;
@@ -32,14 +37,14 @@ export component MetricRow inherits HorizontalLayout {
     }
     Text {
         text: data.secondary-text;
-        color: Theme.text;
+        color: Theme.level-text(data.level);
         horizontal-alignment: right;
         vertical-alignment: center;
         width: 36px;
     }
-    // Sparkline slot (US3).
-    Rectangle {
-        width: 60px;
-        height: 20px;
+    Sparkline {
+        commands: data.sparkline;
+        // Same color as the value, including Warning colors (contracts/ui.md).
+        stroke: Theme.level-text(data.level);
     }
 }

@@ -1,11 +1,15 @@
 //! The sampler thread: reads every Metric once per second and hands an immutable `Snapshot` to
 //! the UI thread (research R10). It owns all per-tick state, so no locks are needed.
 
+use std::collections::BTreeMap;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
+use crate::domain::history::History;
 use crate::domain::metric::{MetricKind, Reading, Reason};
+use crate::domain::status_dot;
+use crate::domain::warning::{self, Thresholds, WarningLevel};
 use crate::platform::cpu::CpuTimes;
 use crate::platform::gpu::{GpuReadings, GpuSource};
 use crate::platform::pawnio::CpuTemperatureSource;
@@ -26,6 +30,12 @@ struct Sampler {
     gpu: Result<GpuSource, Reason>,
     drive_letters: Vec<char>,
     drives_enumerated: Option<Instant>,
+    /// Previous Warning Levels, for hysteresis (FR-015).
+    levels: [Option<WarningLevel>; 6],
+    drive_levels: BTreeMap<char, WarningLevel>,
+    histories: [History; 6],
+    /// Wall-clock time of the previous tick, to detect sleep (FR-021).
+    previous_tick: Option<SystemTime>,
 }
 
 impl Sampler {
@@ -36,6 +46,10 @@ impl Sampler {
             gpu: GpuSource::open(),
             drive_letters: Vec::new(),
             drives_enumerated: None,
+            levels: [None; 6],
+            drive_levels: BTreeMap::new(),
+            histories: Default::default(),
+            previous_tick: None,
         }
     }
 
@@ -57,16 +71,53 @@ impl Sampler {
             gpu.vram,
             memory::memory_usage(),
         ];
+        let gaps = self.missed_seconds();
+        for kind in MetricKind::ALL {
+            let i = kind.index();
+            self.histories[i].push_gaps(gaps);
+            self.histories[i].push(readings[i].value());
+            self.levels[i] = readings[i].value().map(|v| match thresholds(kind) {
+                Some(t) => warning::next_level(self.levels[i], v, t),
+                None => WarningLevel::Normal,
+            });
+        }
         let metrics = MetricKind::ALL.map(|kind| MetricState {
             kind,
             reading: readings[kind.index()],
+            level: self.levels[kind.index()],
+            history: self.histories[kind.index()].clone(),
         });
+        let drives = self.read_drives();
 
+        let dot = status_dot::compute(
+            &metrics.each_ref().map(|m| (m.kind, m.level)),
+            &drives
+                .iter()
+                .map(|d| match d {
+                    DriveState::Ready { drive, level } => (drive.letter, Some(*level)),
+                    DriveState::Unavailable { letter, .. } => (*letter, None),
+                })
+                .collect::<Vec<_>>(),
+        );
         Snapshot {
             metrics,
-            drives: self.read_drives(),
-            tooltip: APP_NAME.to_string(),
+            drives,
+            tooltip: status_dot::tooltip(APP_NAME, &dot),
+            status_dot: dot,
         }
+    }
+
+    /// Seconds with no tick since the previous one (the PC slept): wall-clock gaps above 1.5 s
+    /// become `min(elapsed − 1, 60)` gap samples (research R10).
+    fn missed_seconds(&mut self) -> usize {
+        let now = SystemTime::now();
+        let missed = self
+            .previous_tick
+            .and_then(|t| now.duration_since(t).ok())
+            .filter(|elapsed| elapsed.as_secs_f32() > 1.5)
+            .map_or(0, |elapsed| (elapsed.as_secs_f32() - 1.0).round() as usize);
+        self.previous_tick = Some(now);
+        missed.min(crate::domain::history::CAPACITY)
     }
 
     /// Free space of known Drives every tick; the list itself every `DRIVE_ENUMERATION`.
@@ -78,14 +129,55 @@ impl Sampler {
             self.drive_letters = drives::enumerate();
             self.drives_enumerated = Some(Instant::now());
         }
-        self.drive_letters
-            .iter()
-            .map(|&letter| match drives::read(letter) {
-                Ok(drive) => DriveState::Ready(drive),
-                Err(reason) => DriveState::Unavailable { letter, reason },
-            })
-            .collect()
+        // Forget levels of Drives that disappeared.
+        let letters = &self.drive_letters;
+        self.drive_levels
+            .retain(|letter, _| letters.contains(letter));
+
+        let mut states = Vec::with_capacity(self.drive_letters.len());
+        for &letter in &self.drive_letters {
+            states.push(match drives::read(letter) {
+                Ok(drive) => {
+                    let previous = self.drive_levels.get(&letter).copied();
+                    let level = warning::next_level(previous, drive.used_pct(), disk_space());
+                    self.drive_levels.insert(letter, level);
+                    DriveState::Ready { drive, level }
+                }
+                Err(reason) => {
+                    self.drive_levels.remove(&letter);
+                    DriveState::Unavailable { letter, reason }
+                }
+            });
+        }
+        states
     }
+}
+
+/// FR-014 thresholds. Debug builds can lower them all by `COMPUTER_STATS_TEST_THRESHOLD_OFFSET`
+/// (e.g. `60`) to see Warning colors without loading the PC (quickstart Q4–Q6).
+fn thresholds(kind: MetricKind) -> Option<Thresholds> {
+    warning::thresholds(kind).map(offset)
+}
+
+fn disk_space() -> Thresholds {
+    offset(warning::DISK_SPACE)
+}
+
+#[cfg(debug_assertions)]
+fn offset(t: Thresholds) -> Thresholds {
+    let by = std::env::var("COMPUTER_STATS_TEST_THRESHOLD_OFFSET")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(0.0);
+    Thresholds {
+        warning: t.warning - by,
+        critical: t.critical - by,
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn offset(t: Thresholds) -> Thresholds {
+    t
 }
 
 /// Stops the sampler thread when `stop()` is called or when dropped.

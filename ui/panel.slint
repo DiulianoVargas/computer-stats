@@ -29,12 +29,12 @@ export component PanelWindow inherits Window {
 
     // Drives beyond this many scroll (spec edge case "Many Drives").
     property <int> visible-drives: min(drives.length, 6);
-    property <length> drive-row-height: 36px;
+    property <length> drive-row-height: 32px;
 
     title: "Computer Stats";
     no-frame: true;
     always-on-top: true;
-    width: 340px;
+    width: 320px;
     height: panel-height;
     background: Theme.background;
     default-font-size: Theme.font-size;

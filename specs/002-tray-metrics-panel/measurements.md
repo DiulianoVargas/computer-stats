@@ -56,3 +56,14 @@ Accuracy vs `nvidia-smi` (GTX 1660 SUPER, idle): VRAM used 1.3 GB vs 1325 MiB an
 `GPU Adapter Memory\Dedicated Usage` counter 1.30 GB; GPU Temperature 37 °C vs 35 °C; GPU Usage 0 %
 vs the `GPU Engine` counters' 1.1 % (nvidia-smi reports 10 %: a different definition). VRAM total is
 5.8 GB (`DedicatedVideoMemorySize`, usable by Windows) vs 6.0 GB in nvidia-smi.
+
+## US2 + US3 checks (2026-10-20, debug build, not elevated)
+
+- Q4/Q6 with `COMPUTER_STATS_TEST_THRESHOLD_OFFSET=20`: Memory Usage (70 %) and Drive C: (92 % used)
+  turned red in the Panel, including the Drive bar. With real thresholds, C: at 92 % used is amber
+  (Warning) and the Status Dot stays Normal, as FR-017 requires.
+- Q7: a 5–8 s all-core load shows as a bump in the CPU Usage Sparkline; history before the app
+  started is left empty (no fabricated values).
+- Pending user check: the Status Dot on the Tray Icon and its tooltip; the Sparkline gap after
+  sleep/resume.
+- Panel compacted after user feedback: 340 × 320 → 320 × 270 logical px with the same content.
