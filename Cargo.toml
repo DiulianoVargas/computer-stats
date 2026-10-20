@@ -1,9 +1,12 @@
 [package]
 name = "computer-stats"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 publish = false
-description = "Lightweight Windows tray visualizer for Metrics"
+description = "Lightweight Windows tray visualizer for Metrics and Processes"
+authors = ["Diuliano Vargas"]
+license = "MIT"
+repository = "https://github.com/DiulianoVargas/computer-stats"
 
 # The app logic lives in the library so `cargo test` runs it without the elevation manifest,
 # which is embedded only in the binary (research R6).
@@ -21,8 +24,10 @@ test = false
 slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "unstable-winit-030"] }
 # Win32 FFI for the Tray Icon, Panel window tweaks and Metric sources (Constitution III: used only in src/platform/).
 # Wdk_Graphics_Direct3D: D3DKMT GPU statistics in gdi32 (ADR-0003).
+# Wdk_System_SystemInformation: process enumeration for the Processes View (003 research R1).
 windows = { version = "0.62", default-features = false, features = [
     "Wdk_Graphics_Direct3D",
+    "Wdk_System_SystemInformation",
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
@@ -44,6 +49,8 @@ windows = { version = "0.62", default-features = false, features = [
 [build-dependencies]
 # Compiles ui/*.slint into Rust at build time.
 slint-build = "1.18"
+# Embeds the app icon and version info (rc.exe from the Windows SDK); build-time only.
+embed-resource = "3"
 
 [profile.release]
 lto = true

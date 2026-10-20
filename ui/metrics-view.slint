@@ -1,0 +1,69 @@
+// The Metrics View (feature 002, unchanged): stacked Metric sections and Drives.
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { MetricRow, MetricRowData } from "metric-row.slint";
+import { DriveRow, DriveRowData } from "drive-row.slint";
+
+export { MetricRowData, DriveRowData }
+
+component SectionHeader inherits Text {
+    color: Theme.section-text;
+    font-size: Theme.section-font-size;
+    font-weight: 600;
+}
+
+export component MetricsView inherits VerticalLayout {
+    in property <MetricRowData> cpu-usage;
+    in property <MetricRowData> cpu-temperature;
+    in property <MetricRowData> gpu-usage;
+    in property <MetricRowData> gpu-temperature;
+    in property <MetricRowData> vram;
+    in property <MetricRowData> memory-usage;
+    in property <[DriveRowData]> drives;
+
+    // Drives beyond this many scroll (spec edge case "Many Drives").
+    property <int> visible-drives: min(drives.length, 6);
+    property <length> drive-row-height: 32px;
+
+    spacing: Theme.section-gap;
+
+    VerticalLayout {
+        spacing: Theme.row-gap;
+        SectionHeader { text: "CPU"; }
+        MetricRow { data: root.cpu-usage; }
+        MetricRow { data: root.cpu-temperature; }
+    }
+
+    VerticalLayout {
+        spacing: Theme.row-gap;
+        SectionHeader { text: "GPU"; }
+        MetricRow { data: root.gpu-usage; }
+        MetricRow { data: root.gpu-temperature; }
+        MetricRow { data: root.vram; }
+    }
+
+    VerticalLayout {
+        spacing: Theme.row-gap;
+        SectionHeader { text: "Memory"; }
+        MetricRow { data: root.memory-usage; }
+    }
+
+    VerticalLayout {
+        spacing: Theme.row-gap;
+        SectionHeader { text: "Drives"; }
+        if root.drives.length <= 6: VerticalLayout {
+            spacing: Theme.row-gap;
+            for drive in root.drives: DriveRow { data: drive; }
+        }
+        if root.drives.length > 6: ScrollView {
+            height: root.visible-drives * (root.drive-row-height + Theme.row-gap);
+            VerticalLayout {
+                spacing: Theme.row-gap;
+                padding-right: 12px;
+                for drive in root.drives: DriveRow { data: drive; }
+            }
+        }
+    }
+
+    // App Volumes section: added below the Metrics by a later feature (002 FR-010).
+}

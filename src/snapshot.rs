@@ -5,6 +5,7 @@ use crate::domain::history::History;
 use crate::domain::metric::{MetricKind, Reading, Reason};
 use crate::domain::status_dot::StatusDot;
 use crate::domain::warning::WarningLevel;
+use crate::process_sampler::ProcessesSample;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetricState {
@@ -31,6 +32,8 @@ pub struct Snapshot {
     pub drives: Vec<DriveState>,
     pub status_dot: StatusDot,
     pub tooltip: String,
+    /// Only while the Processes View is visible (003 FR-018).
+    pub processes: Option<ProcessesSample>,
 }
 
 pub const APP_NAME: &str = "Computer Stats";
@@ -51,6 +54,7 @@ impl Snapshot {
                 cause: None,
             },
             tooltip: APP_NAME.to_string(),
+            processes: None,
         }
     }
 }

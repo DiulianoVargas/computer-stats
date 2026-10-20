@@ -45,6 +45,25 @@ pub fn drive_label(letter: char, label: &str) -> String {
     }
 }
 
+/// App memory: `"812 MB"` below 1000 MB, `"1.4 GB"` from 1000 MB (1 MB = 1024² bytes).
+pub fn memory(bytes: u64) -> String {
+    let mb = bytes as f64 / (1024.0 * 1024.0);
+    if mb.round() >= 1000.0 {
+        format!("{:.1} GB", mb / 1024.0)
+    } else {
+        format!("{} MB", mb.round() as u64)
+    }
+}
+
+/// `"Google Chrome (15)"`, or just the name for a single Process.
+pub fn app_name_with_count(name: &str, processes: usize) -> String {
+    if processes > 1 {
+        format!("{name} ({processes})")
+    } else {
+        name.to_string()
+    }
+}
+
 /// `"— no GPU"`
 pub fn unavailable(reason: Reason) -> String {
     format!("— {}", reason.message())
@@ -94,6 +113,22 @@ mod tests {
         assert_eq!(drive_label('C', "System"), "C: System");
         assert_eq!(drive_label('D', ""), "D:");
         assert_eq!(drive_label('E', "  "), "E:");
+    }
+
+    #[test]
+    fn app_memory_switches_to_gb_at_1000_mb() {
+        const MB: u64 = 1024 * 1024;
+        assert_eq!(memory(0), "0 MB");
+        assert_eq!(memory(812 * MB), "812 MB");
+        assert_eq!(memory(999 * MB), "999 MB");
+        assert_eq!(memory(1000 * MB), "1.0 GB");
+        assert_eq!(memory(1434 * MB), "1.4 GB");
+    }
+
+    #[test]
+    fn app_name_count() {
+        assert_eq!(app_name_with_count("Chrome", 15), "Chrome (15)");
+        assert_eq!(app_name_with_count("Notepad", 1), "Notepad");
     }
 
     #[test]

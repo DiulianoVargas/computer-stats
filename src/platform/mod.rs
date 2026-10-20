@@ -4,9 +4,11 @@
 pub mod cpu;
 pub mod drives;
 pub mod gpu;
+pub mod icons;
 pub mod instance;
 pub mod memory;
 pub mod pawnio;
+pub mod processes;
 pub mod shell;
 pub mod theme;
 pub mod tray;

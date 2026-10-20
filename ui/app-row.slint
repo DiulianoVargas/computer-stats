@@ -1,0 +1,109 @@
+// One App in the Processes View (003 contracts/ui.md).
+import { Theme } from "theme.slint";
+
+export struct AppRowData {
+    key: string,
+    // Name with " (n)" when the App has several Processes.
+    name: string,
+    // "12 %", or "—" before the second sample.
+    cpu-text: string,
+    // "812 MB" / "1.4 GB".
+    memory-text: string,
+    icon: image,
+    has-icon: bool,
+    // Waiting for the confirming click (End App).
+    armed: bool,
+    // Ended; waiting for the next sample to drop the row.
+    ending: bool,
+    // Shown instead of Memory and the button for a few seconds, e.g. "access denied".
+    message: string,
+}
+
+export component AppRow inherits Rectangle {
+    in property <AppRowData> data;
+    callback end-clicked(string);
+
+    height: 24px;
+
+    HorizontalLayout {
+        spacing: 4px;
+        padding-right: 4px;
+
+        // Icon, or a generic placeholder.
+        VerticalLayout {
+            alignment: center;
+            width: 16px;
+            if data.has-icon: Image {
+                source: data.icon;
+                width: 16px;
+                height: 16px;
+                image-rendering: smooth;
+            }
+            if !data.has-icon: Rectangle {
+                width: 14px;
+                height: 14px;
+                border-radius: 3px;
+                border-width: 1px;
+                border-color: Theme.muted-text;
+            }
+        }
+
+        Text {
+            text: data.name;
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+
+        if data.message == "": Text {
+            text: data.cpu-text;
+            color: Theme.text;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            width: 36px;
+        }
+        if data.message == "": Text {
+            text: data.memory-text;
+            color: Theme.text;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            width: 56px;
+        }
+        if data.message == "": Rectangle {
+            width: 60px;
+
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 20px;
+                border-radius: 4px;
+                border-width: data.armed ? 0 : 1px;
+                border-color: Theme.border;
+                background: data.armed ? Theme.critical : touch.has-hover && !data.ending ? Theme.bar-track : transparent;
+                opacity: data.ending ? 0.4 : 1;
+
+                Text {
+                    text: data.armed ? "Confirm?" : "End";
+                    color: data.armed ? #ffffff : Theme.text;
+                    font-size: 12px;
+                    font-weight: data.armed ? 600 : 400;
+                }
+
+                touch := TouchArea {
+                    enabled: !data.ending;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.end-clicked(data.key);
+                    }
+                }
+            }
+        }
+        if data.message != "": Text {
+            text: data.message;
+            color: Theme.muted-text;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            width: 160px;
+        }
+    }
+}

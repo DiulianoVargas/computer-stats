@@ -1,18 +1,39 @@
-// The Panel (contracts/ui.md): stacked sections, read-only, Esc closes it.
-import { ScrollView } from "std-widgets.slint";
+// The Panel (002/003 contracts/ui.md): two Views switched by tabs; Esc closes it.
 import { Theme } from "theme.slint";
-import { MetricRow, MetricRowData } from "metric-row.slint";
-import { DriveRow, DriveRowData } from "drive-row.slint";
+import { MetricsView, MetricRowData, DriveRowData } from "metrics-view.slint";
+import { ProcessesView, AppRowData } from "processes-view.slint";
 
-export { MetricRowData, DriveRowData }
+export { MetricRowData, DriveRowData, AppRowData }
 
-component SectionHeader inherits Text {
-    color: Theme.section-text;
-    font-size: Theme.section-font-size;
-    font-weight: 600;
+component Tab inherits VerticalLayout {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked();
+
+    spacing: 3px;
+
+    Text {
+        text: root.text;
+        color: root.active ? Theme.text : Theme.muted-text;
+        font-weight: root.active ? 600 : 400;
+
+        TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+
+    Rectangle {
+        height: 2px;
+        border-radius: 1px;
+        background: root.active ? Theme.accent-bar : transparent;
+    }
 }
 
 export component PanelWindow inherits Window {
+    // Metrics View
     in property <MetricRowData> cpu-usage;
     in property <MetricRowData> cpu-temperature;
     in property <MetricRowData> gpu-usage;
@@ -21,15 +42,34 @@ export component PanelWindow inherits Window {
     in property <MetricRowData> memory-usage;
     in property <[DriveRowData]> drives;
 
+    // Processes View
+    in property <[AppRowData]> apps;
+    in property <int> sort;
+    in property <bool> apps-loading: true;
+    out property <bool> apps-hovered: processes.list-hovered;
+
+    // 0 Metrics View, 1 Processes View.
+    in-out property <int> view;
+
     // Esc pressed; the app hides the Panel.
     callback close-requested();
+    callback view-changed(int);
+    callback sort-clicked(int);
+    callback end-clicked(string);
+    callback background-clicked();
+    // The Panel's height changed (View switch, Drives added or removed): the app re-anchors it.
+    callback panel-height-changed();
+
+    changed panel-height => {
+        root.panel-height-changed();
+    }
+
+    property <length> tabs-height: 22px;
+    // The Processes View's Panel height is fixed (contracts/ui.md).
+    property <length> processes-height: 460px;
 
     // Logical height the Panel needs, so the app can position it before showing it.
-    out property <length> panel-height: min(content.preferred-height, 640px);
-
-    // Drives beyond this many scroll (spec edge case "Many Drives").
-    property <int> visible-drives: min(drives.length, 6);
-    property <length> drive-row-height: 32px;
+    out property <length> panel-height: view == 1 ? processes-height : min(content.preferred-height, 640px);
 
     title: "Computer Stats";
     no-frame: true;
@@ -40,10 +80,21 @@ export component PanelWindow inherits Window {
     default-font-size: Theme.font-size;
     forward-focus: keys;
 
+    function switch-to(v: int) {
+        if (root.view != v) {
+            root.view = v;
+            root.view-changed(v);
+        }
+    }
+
     keys := FocusScope {
         key-pressed(event) => {
             if (event.text == Key.Escape) {
                 root.close-requested();
+                return accept;
+            }
+            if (event.text == Key.Tab && event.modifiers.control) {
+                root.switch-to(root.view == 0 ? 1 : 0);
                 return accept;
             }
             reject
@@ -53,49 +104,73 @@ export component PanelWindow inherits Window {
             border-width: 1px;
             border-color: Theme.border;
 
+            // Clicks that reach the background cancel an armed End.
+            TouchArea {
+                clicked => {
+                    root.background-clicked();
+                }
+            }
+
             content := VerticalLayout {
                 padding: Theme.padding;
                 spacing: Theme.section-gap;
 
-                VerticalLayout {
-                    spacing: Theme.row-gap;
-                    SectionHeader { text: "CPU"; }
-                    MetricRow { data: root.cpu-usage; }
-                    MetricRow { data: root.cpu-temperature; }
-                }
+                HorizontalLayout {
+                    spacing: 16px;
+                    alignment: start;
+                    height: root.tabs-height;
 
-                VerticalLayout {
-                    spacing: Theme.row-gap;
-                    SectionHeader { text: "GPU"; }
-                    MetricRow { data: root.gpu-usage; }
-                    MetricRow { data: root.gpu-temperature; }
-                    MetricRow { data: root.vram; }
-                }
-
-                VerticalLayout {
-                    spacing: Theme.row-gap;
-                    SectionHeader { text: "Memory"; }
-                    MetricRow { data: root.memory-usage; }
-                }
-
-                VerticalLayout {
-                    spacing: Theme.row-gap;
-                    SectionHeader { text: "Drives"; }
-                    if root.drives.length <= 6: VerticalLayout {
-                        spacing: Theme.row-gap;
-                        for drive in root.drives: DriveRow { data: drive; }
+                    Tab {
+                        text: "Metrics";
+                        active: root.view == 0;
+                        clicked => {
+                            root.switch-to(0);
+                        }
                     }
-                    if root.drives.length > 6: ScrollView {
-                        height: root.visible-drives * (root.drive-row-height + Theme.row-gap);
-                        VerticalLayout {
-                            spacing: Theme.row-gap;
-                            padding-right: 12px;
-                            for drive in root.drives: DriveRow { data: drive; }
+                    Tab {
+                        text: "Processes";
+                        active: root.view == 1;
+                        clicked => {
+                            root.switch-to(1);
                         }
                     }
                 }
 
-                // App Volumes section: added below the Metrics by a later feature (FR-010).
+                // Both Views always exist, so the Panel's height is right the moment the View
+                // changes; only the shown one takes space.
+                VerticalLayout {
+                    spacing: 0;
+
+                    MetricsView {
+                        visible: root.view == 0;
+                        height: root.view == 0 ? self.preferred-height : 0px;
+                        cpu-usage: root.cpu-usage;
+                        cpu-temperature: root.cpu-temperature;
+                        gpu-usage: root.gpu-usage;
+                        gpu-temperature: root.gpu-temperature;
+                        vram: root.vram;
+                        memory-usage: root.memory-usage;
+                        drives: root.drives;
+                    }
+
+                    processes := ProcessesView {
+                        visible: root.view == 1;
+                        // The rest of the fixed-height Panel; nothing while hidden.
+                        height: root.view == 1 ? root.processes-height - 2 * Theme.padding - root.tabs-height - Theme.section-gap : 0px;
+                        apps: root.apps;
+                        sort: root.sort;
+                        loading: root.apps-loading;
+                        sort-clicked(column) => {
+                            root.sort-clicked(column);
+                        }
+                        end-clicked(key) => {
+                            root.end-clicked(key);
+                        }
+                        background-clicked => {
+                            root.background-clicked();
+                        }
+                    }
+                }
             }
         }
     }

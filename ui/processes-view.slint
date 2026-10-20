@@ -1,0 +1,103 @@
+// The Processes View (003 contracts/ui.md): Apps with CPU and memory, End App.
+import { ListView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { AppRow, AppRowData } from "app-row.slint";
+
+export { AppRowData }
+
+component HeaderCell inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <bool> clickable;
+    callback clicked();
+
+    Text {
+        x: 0;
+        width: parent.width;
+        text: root.active ? root.text + " ▼" : root.text;
+        color: root.active ? Theme.text : Theme.section-text;
+        font-size: Theme.section-font-size;
+        font-weight: 600;
+        horizontal-alignment: root.clickable ? right : left;
+        vertical-alignment: center;
+    }
+
+    if root.clickable: TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component ProcessesView inherits VerticalLayout {
+    in property <[AppRowData]> apps;
+    // 0 CPU, 1 Memory.
+    in property <int> sort;
+    // True until the first sample arrives.
+    in property <bool> loading;
+    // The pointer is over the list: the app keeps the row order still (FR-010).
+    out property <bool> list-hovered: list-area.has-hover;
+
+    callback sort-clicked(int);
+    callback end-clicked(string);
+    // A click in the list that was not on an End button: cancels arming.
+    callback background-clicked();
+
+    spacing: 4px;
+
+    HorizontalLayout {
+        spacing: 4px;
+        padding-left: 20px;
+        padding-right: 4px;
+        height: 18px;
+
+        HeaderCell {
+            text: "Name";
+            horizontal-stretch: 1;
+        }
+        HeaderCell {
+            text: "CPU";
+            width: 36px;
+            active: root.sort == 0;
+            clickable: true;
+            clicked => {
+                root.sort-clicked(0);
+            }
+        }
+        HeaderCell {
+            text: "Memory";
+            width: 56px;
+            active: root.sort == 1;
+            clickable: true;
+            clicked => {
+                root.sort-clicked(1);
+            }
+        }
+        Rectangle {
+            width: 60px;
+        }
+    }
+
+    list-area := TouchArea {
+        vertical-stretch: 1;
+        clicked => {
+            root.background-clicked();
+        }
+
+        if root.loading: Text {
+            text: "Reading processes...";
+            color: Theme.muted-text;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if !root.loading: ListView {
+            for app in root.apps: AppRow {
+                data: app;
+                end-clicked(key) => {
+                    root.end-clicked(key);
+                }
+            }
+        }
+    }
+}
