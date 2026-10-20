@@ -44,7 +44,7 @@ const NUVOTON_CHANNELS: [FanRegisters; 7] = [
     nuvoton(0x4CC),
 ];
 
-/// The IT8628E / IT8686E / IT8688E fan counts, in channel order (research R9).
+/// The IT8628E / IT8686E / IT8688E / IT8689E fan counts, in channel order (research R9).
 const ITE_CHANNELS: [FanRegisters; 6] = [
     ite(0x0D, 0x18),
     ite(0x0E, 0x19),
@@ -62,6 +62,9 @@ pub struct FanChip {
     pub family: ChipFamily,
     /// Fan count registers per channel, in channel order.
     pub channels: &'static [FanRegisters],
+    /// ITE IT8689E: register `0x06` bits 5–7 select a register bank; the fan counts are in bank 0
+    /// (research R9).
+    pub ite_banks: bool,
 }
 
 /// The Nuvoton chip for a Super I/O chip ID and revision (research R3); `None` → not one we read.
@@ -79,6 +82,7 @@ pub fn fan_chip(id: u8, revision: u8) -> Option<FanChip> {
         name,
         family: ChipFamily::Nuvoton,
         channels: &NUVOTON_CHANNELS[..count],
+        ite_banks: false,
     })
 }
 
@@ -88,12 +92,14 @@ pub fn ite_chip(id: u16) -> Option<FanChip> {
         0x8628 => "ITE IT8628E",
         0x8686 => "ITE IT8686E",
         0x8688 => "ITE IT8688E",
+        0x8689 => "ITE IT8689E",
         _ => return None,
     };
     Some(FanChip {
         name,
         family: ChipFamily::Ite,
         channels: &ITE_CHANNELS,
+        ite_banks: id == 0x8689,
     })
 }
 
@@ -325,7 +331,11 @@ mod tests {
             })
         );
         assert!(ite_chip(0x8686).is_some() && ite_chip(0x8628).is_some());
-        assert_eq!(ite_chip(0x8689), None); // banked registers: not read yet
+        assert_eq!(chip.map(|c| c.ite_banks), Some(false));
+        // Gigabyte B550M AORUS ELITE: the same fan registers, in bank 0.
+        let banked = ite_chip(0x8689);
+        assert_eq!(banked.map(|c| c.name), Some("ITE IT8689E"));
+        assert_eq!(banked.map(|c| c.ite_banks), Some(true));
         assert_eq!(ite_chip(0xFFFF), None);
     }
 

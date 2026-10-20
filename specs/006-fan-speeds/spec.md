@@ -199,7 +199,7 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
   NVIDIA GeForce GTX 1660 SUPER; Windows reports no fans through its own management interface.
 - PawnIO.Modules 0.2.11 includes `LpcIO.bin`, which gives access to the motherboard's monitoring
   chip (Super I/O). The chips supported are the Nuvoton NCT6796D–NCT6799D and NCT6701D family
-  (ASUS, MSI) and the ITE IT8628E, IT8686E and IT8688E (Gigabyte; research R9); others give
+  (ASUS, MSI) and the ITE IT8628E, IT8686E, IT8688E and IT8689E (Gigabyte; research R9); others give
   `— unsupported motherboard` until added.
 - Spike S1 (2026-10-20): the developer's board has a Nuvoton NCT6701D whose firmware sets the
   read lock. Since the revision of FR-006 the app clears it, so the fans are validated on the

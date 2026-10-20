@@ -96,7 +96,7 @@ Fan speeds never turn amber or red: a fan's speed alone does not say whether som
 | GPU usage, temperature, VRAM | Any dedicated GPU (NVIDIA, AMD, Intel Arc) — read from Windows itself, like Task Manager. Integrated graphics are ignored. |
 | CPU temperature | **AMD Ryzen** and **Intel** CPUs, with the [PawnIO](https://pawnio.eu) driver installed and the app running as administrator |
 | GPU fan | A dedicated GPU whose driver reports its fan speed (e.g. NVIDIA) |
-| Motherboard fans | Desktop boards with a **Nuvoton NCT6796D–NCT6799D / NCT6701D** (most current ASUS and MSI boards) or an **ITE IT8628E / IT8686E / IT8688E** (Gigabyte boards) monitoring chip, PawnIO installed and the app running as administrator. Laptops are not supported. |
+| Motherboard fans | Desktop boards with a **Nuvoton NCT6796D–NCT6799D / NCT6701D** (most current ASUS and MSI boards) or an **ITE IT8628E / IT8686E / IT8688E / IT8689E** (Gigabyte boards) monitoring chip, PawnIO installed and the app running as administrator. Laptops are not supported. |
 
 When something can't be read, the Panel shows `—` and the reason (`no GPU`, `driver not found`,
 `unsupported CPU`, …) and everything else keeps working.

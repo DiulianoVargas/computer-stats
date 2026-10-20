@@ -122,8 +122,12 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
   iCUE but would get `— unsupported motherboard` here: Gigabyte boards use ITE chips.
 - **Decision**: support the ITE IT8628E, IT8686E and IT8688E, which share one register layout and
   need no bank select (LibreHardwareMonitor `IT87XX.cs`, reimplemented from the register map).
-  IT8689E (banked registers) and the second ITE chip some Gigabyte boards have (IT879x on port
-  0x4E, behind a Gigabyte embedded controller) are left out.
+  The second ITE chip some Gigabyte boards have (IT879x on port 0x4E, behind a Gigabyte embedded
+  controller) is left out.
+- **IT8689E (added 2026-10-20)**: the Gigabyte B550M AORUS ELITE's chip (its `crash.log` line read
+  `ITE 0x8689`). Same fan registers, but register `0x06` bits 5–7 select a register bank; the fan
+  counts and `0x0C` are in bank 0. Before reading, bank 0 is selected if another tool left another
+  one, and that bank is restored after.
 - **Detection**: after the Nuvoton attempt on port 0x2E fails, enter ITE configuration mode with
   `87 01 55 55`, read the 16-bit chip ID (`0x20` high, `0x21` low), `find_bars`, select logical
   device `0x04` (environment controller), read the base `0x60` twice; exit by writing `0x02` to

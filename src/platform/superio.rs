@@ -31,6 +31,9 @@ const ITE_EXIT: u8 = 0x02;
 const ITE_ENVIRONMENT_DEVICE: u8 = 0x04;
 /// ITE hardware monitor: fan tachometer mode (which of channels 4–6 count).
 const ITE_FAN_MODES: u8 = 0x0C;
+/// ITE IT8689E hardware monitor: bits 5–7 of register `0x06` select the register bank.
+const ITE_BANK_SELECT: u8 = 0x06;
+const ITE_BANK_BITS: u8 = 0xE0;
 const DEVICE_SELECT: u8 = 0x07;
 const CHIP_ID: u8 = 0x20;
 const CHIP_REVISION: u8 = 0x21;
@@ -277,7 +280,7 @@ impl FanSource {
         else {
             return Ok(detection);
         };
-        let modes = self.monitor_in(base, ITE_FAN_MODES)?;
+        let modes = self.in_ite_bank0(base, chip, || self.monitor_in(base, ITE_FAN_MODES))?;
         Ok(Detection::Ready {
             port,
             base,
@@ -341,21 +344,45 @@ impl FanSource {
     }
 
     /// Both bytes of every channel's fan count (the caller holds the mutex). Nuvoton: the bank is
-    /// selected once; ITE has no banks.
+    /// selected once. ITE IT8689E: bank 0 is selected if another tool left another one, and that
+    /// bank is restored after.
     fn read_counts(&self, base: u16, chip: FanChip) -> Result<Vec<(u8, u8)>, Reason> {
         if chip.family == ChipFamily::Nuvoton {
             let bank = (chip.channels[0].high >> 8) as u8;
             self.port_out(base + INDEX_OFFSET, BANK_SELECT)?;
             self.port_out(base + DATA_OFFSET, bank)?;
         }
-        chip.channels
-            .iter()
-            .map(|r| {
-                let high = self.monitor_in(base, (r.high & 0xFF) as u8)?;
-                let low = self.monitor_in(base, (r.low & 0xFF) as u8)?;
-                Ok((high, low))
-            })
-            .collect()
+        self.in_ite_bank0(base, chip, || {
+            chip.channels
+                .iter()
+                .map(|r| {
+                    let high = self.monitor_in(base, (r.high & 0xFF) as u8)?;
+                    let low = self.monitor_in(base, (r.low & 0xFF) as u8)?;
+                    Ok((high, low))
+                })
+                .collect()
+        })
+    }
+
+    /// Runs `read` with ITE bank 0 selected on a banked chip, restoring the bank another tool left.
+    fn in_ite_bank0<T>(
+        &self,
+        base: u16,
+        chip: FanChip,
+        read: impl FnOnce() -> Result<T, Reason>,
+    ) -> Result<T, Reason> {
+        if !chip.ite_banks {
+            return read();
+        }
+        let bank = self.monitor_in(base, ITE_BANK_SELECT)?;
+        if bank & ITE_BANK_BITS == 0 {
+            return read();
+        }
+        self.port_out(base + DATA_OFFSET, bank & !ITE_BANK_BITS)?;
+        let result = read();
+        self.port_out(base + INDEX_OFFSET, ITE_BANK_SELECT)?;
+        self.port_out(base + DATA_OFFSET, bank)?;
+        result
     }
 
     /// One hardware monitor register (in the current bank).
