@@ -1,10 +1,9 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
-- Modified principles: III. Unsafe Isolation (FFI list: NVML → D3DKMT)
-- Modified sections: Technical Constraints (GPU data source: NVML → Windows graphics statistics,
-  ADR-0003)
-- Rationale: NVML cost ≈ 19.5 MB private memory, leaving no headroom in Principle I's 30 MB budget
+- Version change: 1.1.0 → 1.2.0
+- Modified principles: IV. Elevated Minimal Surface (adds the rule bounding End App)
+- Rationale: feature 003 lets the always-elevated app end other programs' Processes; like App
+  Volume, this must only follow direct, confirmed user input
 - Templates requiring updates: none (templates read the constitution at runtime)
 - Follow-up TODOs: none
 -->
@@ -53,6 +52,7 @@ reviewable place.
 - The app MUST NOT spawn processes, except `schtasks` to manage Start with Windows.
 - The app MUST NOT load plugins or external code at runtime.
 - App Volume MUST change only in response to direct user input in the Panel.
+- Apps MUST be ended only in response to direct, confirmed user input in the Panel (End App).
 
 Rationale: an always-elevated process is a privilege-escalation target; every capability it
 lacks is one that cannot be abused.
@@ -129,4 +129,4 @@ Every release MUST additionally pass the resource-budget measurement script (Pri
 - Plans MUST include a constitution check; any deviation MUST be justified in the plan's
   complexity tracking.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-20
+**Version**: 1.2.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-20
