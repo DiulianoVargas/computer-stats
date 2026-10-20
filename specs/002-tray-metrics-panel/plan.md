@@ -89,7 +89,9 @@ ui/
 ├── drive-row.slint      # Drive label + bar + free text
 └── panel.slint          # PanelWindow: stacked sections, Esc handling
 src/
-├── main.rs              # #![deny(unsafe_code)], #![windows_subsystem = "windows"]; startup wiring
+├── main.rs              # thin binary: #![windows_subsystem = "windows"], calls computer_stats::run()
+├── lib.rs               # #![deny(unsafe_code)]; all modules; startup wiring (lib so `cargo test` runs
+│                        #   without the elevation manifest, which only the binary embeds)
 ├── domain/              # pure, no I/O
 │   ├── mod.rs
 │   ├── metric.rs        # MetricKind, Reading, Reason

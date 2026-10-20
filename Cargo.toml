@@ -1,0 +1,57 @@
+[package]
+name = "computer-stats"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Lightweight Windows tray visualizer for Metrics"
+
+# The app logic lives in the library so `cargo test` runs it without the elevation manifest,
+# which is embedded only in the binary (research R6).
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "computer-stats"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+# UI toolkit (ADR-0001). Software renderer only (Constitution V); raw-window-handle exposes the Panel HWND.
+slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "raw-window-handle-06"] }
+# Win32 FFI for the Tray Icon, Panel window tweaks and Metric sources (Constitution III: used only in src/platform/).
+windows = { version = "0.62", default-features = false, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Ioctl",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_Controls",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+# Reads the Panel's native HWND from Slint's window (research R4).
+raw-window-handle = "0.6"
+
+[build-dependencies]
+# Compiles ui/*.slint into Rust at build time.
+slint-build = "1.18"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+# Size over speed: the empty Slint skeleton is 8.2 MiB at opt-level 3, 7.3 MiB at "s" (exe budget 10 MB).
+opt-level = "s"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
