@@ -27,6 +27,22 @@
   if a never-shown window cannot be snapshotted: show the Slint window **cloaked**
   (`DWMWA_CLOAK`) on the same monitor as the layered window. It stays invisible and still renders.
 
+### Spike S1 result (2026-10-20, Windows 11 build 26300, 1920×1080 at 100 %, 24 threads)
+
+- **(a) Alpha**: passed. The widget was rendered with fixed values and composited over white,
+  black and a Windows wallpaper, in both modes. Text edges blend with no fringe, and the halo keeps
+  every value readable on all six combinations.
+- **(b) Scale**: passed. On a never-shown component, `ScaleFactorChanged` + `set_size` give
+  320×184 at 1.0 and 480×276 at 1.5, rendered sharply at that size. No cloaked fallback needed.
+- **(c) Cost**: 1.78 ms average per frame (max 1.88 ms, release build, 12 live frames), covering
+  the render, both conversions and `UpdateLayeredWindow`. Once per second that is ≈ 0.18 % of one
+  core.
+- **(d) Generation**: passed. `PanelWindow` and `WidgetWindow` are generated from `panel.slint`
+  and coexist in one process.
+- **Layout change**: at 280 px the Memory value (`9.1 / 14.9 GB`) was cut off, so the widget is
+  320 px wide, the same as the Panel.
+- On screen, the live widget stayed behind a maximized window for the whole run.
+
 ## R2. Hit-testing and dragging
 
 - **Decision**: the Slint background is `#00000001` (alpha 1/255), so the whole rectangle has
@@ -55,11 +71,15 @@
 ## R4. Staying visible on "Show desktop" (Win+D)
 
 - **Decision**: an out-of-context `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` on the UI thread.
-  When the foreground window becomes the desktop (class `WorkerW` or `Progman`, owned by the shell
-  process from `GetShellWindow`), the Desktop Widget is raised with `SetWindowPos(HWND_TOP,
-  SWP_NOACTIVATE | SWP_SHOWWINDOW)`, so it shows over the desktop. When any other window becomes
-  foreground, it goes back to `HWND_BOTTOM`. This is the approach Rainmeter's "On desktop" mode
-  uses.
+  - **Raise**: Show desktop brings the shell desktop window (class `WorkerW` or `Progman`) to the
+    front as a **topmost** window. When that happens, the Desktop Widget is raised with
+    `SetWindowPos(HWND_TOPMOST, SWP_NOACTIVATE)` above it, and the `WM_WINDOWPOSCHANGING` guard is
+    switched off.
+  - **Plain click**: clicking the desktop also makes it foreground, but not topmost, so the widget
+    is not raised over other windows.
+  - **Lower**: when any other window becomes foreground, the widget goes `HWND_NOTOPMOST` then
+    `HWND_BOTTOM`.
+  - **Prior art**: the same idea as Rainmeter's "On desktop" mode.
 - **Fallback (FR-014)**: if Win+D still hides it on some Windows build (detected in spike S2 on
   Windows 10 22H2 and Windows 11 24H2+), the hook stays harmless. The widget then hides with the
   other windows and returns with them, with no error and no lost position, which the spec accepts.
@@ -136,8 +156,8 @@
 
 ## R9. Cost
 
-- **Per frame** (estimate, to be confirmed by `scripts/measure.ps1`): ~280×190 logical px, which
-  at 150 % is ~420×285 = 120 k px.
+- **Per frame** (estimate, to be confirmed by `scripts/measure.ps1`): 320×184 logical px, which
+  at 150 % is 480×276 = 132 k px.
   - One full software render.
   - Two conversions over 480 KB.
   - One `UpdateLayeredWindow`.

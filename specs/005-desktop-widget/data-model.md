@@ -41,7 +41,8 @@ the nearest work area; under the taskbar → above it; larger than the work area
 
 - **Off**: no Slint `WidgetWindow`, no layered window, no WinEvent hook, no per-frame work.
 - **On(Behind)**: shown at `HWND_BOTTOM`; repainted on every Snapshot.
-- **On(OverDesktop)**: raised to `HWND_TOP` without activation while the desktop is foreground.
+- **On(OverDesktop)**: raised to `HWND_TOPMOST` without activation while Show desktop holds the
+  desktop (topmost `WorkerW`/`Progman`) in front.
 - Turning off from either On state frees the window, the hook and the buffers.
 - If creating the window fails, the state stays Off, the menu stays unchecked and the failure goes
   to the crash log (FR-013).
@@ -56,9 +57,11 @@ the nearest work area; under the taskbar → above it; larger than the work area
 
 ## Events from the platform window (`platform::desktop_window::WidgetEvent`)
 
+Show desktop (R4) is handled inside the platform window: the foreground hook raises or lowers it
+directly, with no event to the app.
+
 | Event | When | App reaction |
 |-------|------|--------------|
 | `Moved(Point)` | `WM_EXITSIZEMOVE` | clamp, reposition if needed, save |
 | `DpiChanged(f32)` | `WM_DPICHANGED` | re-render at new scale, clamp |
 | `DisplayChanged` | `WM_DISPLAYCHANGE`, work-area change | clamp |
-| `DesktopForeground(bool)` | WinEvent foreground hook | raise or lower (R4) |

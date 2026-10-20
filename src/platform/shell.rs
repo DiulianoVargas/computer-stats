@@ -2,7 +2,8 @@
 
 use windows::Win32::Foundation::{POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromRect,
+    GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MONITORINFO,
+    MonitorFromPoint, MonitorFromRect,
 };
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{
@@ -37,6 +38,20 @@ pub fn work_area_for(rect: Rect) -> Option<Rect> {
         // SAFETY: `r` is a valid RECT; NEAREST always returns a monitor.
         unsafe { MonitorFromRect(&r, MONITOR_DEFAULTTONEAREST) }
     };
+    let mut info = MONITORINFO {
+        cbSize: size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `info` is a valid MONITORINFO with `cbSize` set.
+    unsafe { GetMonitorInfoW(monitor, &mut info) }
+        .as_bool()
+        .then(|| from_win(info.rcWork))
+}
+
+/// The primary monitor's work area: where the Desktop Widget first appears (005 research R6).
+pub fn primary_work_area() -> Option<Rect> {
+    // SAFETY: PRIMARY always returns a monitor.
+    let monitor = unsafe { MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY) };
     let mut info = MONITORINFO {
         cbSize: size_of::<MONITORINFO>() as u32,
         ..Default::default()

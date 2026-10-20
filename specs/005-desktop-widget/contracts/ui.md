@@ -15,7 +15,7 @@
 
 ## Desktop Widget layout
 
-Logical size ≈ 280 × 190 px, fixed (no resizing). It scales with the monitor.
+Logical size 320 × 184 px, fixed (no resizing). It scales with the monitor.
 
 ```text
 CPU

@@ -4,6 +4,8 @@ import { MetricsView, MetricRowData, DriveRowData } from "metrics-view.slint";
 import { ProcessesView, AppRowData } from "processes-view.slint";
 
 export { MetricRowData, DriveRowData, AppRowData }
+// The Desktop Widget is compiled from this entry file too (005 research R8).
+export { WidgetWindow } from "widget.slint";
 
 component Tab inherits VerticalLayout {
     in property <string> text;

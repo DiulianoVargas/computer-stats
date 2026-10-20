@@ -36,8 +36,8 @@ it there, US3 fit any screen and theme.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `windows` feature `Win32_UI_Accessibility` to `Cargo.toml` with the one-line justification "`SetWinEventHook` for the Desktop Widget on Show desktop (005 research R4)"; confirm `cargo build` and `cargo deny check` pass
-- [ ] T002 [P] Create `ui/widget.slint` with a placeholder `export component WidgetWindow inherits Window` (`background: #00000001`, `no-frame: true`, five `in property <MetricRowData>`: `cpu-usage`, `cpu-temperature`, `gpu-usage`, `gpu-temperature`, `memory-usage`; `in property <bool> dark`; one plain Text per Metric). Import `MetricRowData` from `metric-row.slint`, and add `export { WidgetWindow } from "widget.slint";` to `ui/panel.slint`. Confirm `cargo build` generates both `PanelWindow` and `WidgetWindow` in `crate::generated` (research R8)
+- [X] T001 Add `windows` feature `Win32_UI_Accessibility` to `Cargo.toml` with the one-line justification "`SetWinEventHook` for the Desktop Widget on Show desktop (005 research R4)"; confirm `cargo build` and `cargo deny check` pass
+- [X] T002 [P] Create `ui/widget.slint` with a placeholder `export component WidgetWindow inherits Window` (`background: #00000001`, `no-frame: true`, five `in property <MetricRowData>`: `cpu-usage`, `cpu-temperature`, `gpu-usage`, `gpu-temperature`, `memory-usage`; `in property <bool> dark`; one plain Text per Metric). Import `MetricRowData` from `metric-row.slint`, and add `export { WidgetWindow } from "widget.slint";` to `ui/panel.slint`. Confirm `cargo build` generates both `PanelWindow` and `WidgetWindow` in `crate::generated` (research R8)
 
 ---
 
@@ -46,17 +46,17 @@ it there, US3 fit any screen and theme.
 **Purpose**: The rendering pipeline. A never-shown Slint component is rendered and presented on our
 own layered window. Spike S1 proves it before any behaviour is built on top.
 
-- [ ] T003 [P] Add `pub fn apps_use_light_theme() -> bool` to `src/platform/theme.rs`. It reads `AppsUseLightTheme` from the same `Personalize` key as `taskbar_uses_light_theme`. A missing value means light (`true`), which is the Windows default for apps (research R7)
-- [ ] T004 [P] Add `pub fn primary_work_area() -> Option<Rect>` to `src/platform/shell.rs`: the work area of the monitor at (0, 0) (`MonitorFromPoint(MONITOR_DEFAULTTOPRIMARY)` + `GetMonitorInfoW`), using the existing `from_win`
-- [ ] T005 [P] Create `src/domain/widget_place.rs` (register it in `src/domain/mod.rs`). It holds `pub struct WidgetSettings { pub shown: bool, pub position: Option<Point> }` (`Default` = `shown: false, position: None`) and `pub fn default_position(work_area: Rect, size: Size, inset: i32) -> Point`, which returns the top-right corner inset by `inset` on the top and right edges. Unit tests: normal work area; a work area not at the origin (second monitor on the left, negative x); inset 0
-- [ ] T006 Create `src/platform/desktop_window.rs` (register it in `src/platform/mod.rs`) with `pub struct DesktopWindow`:
+- [X] T003 [P] Add `pub fn apps_use_light_theme() -> bool` to `src/platform/theme.rs`. It reads `AppsUseLightTheme` from the same `Personalize` key as `taskbar_uses_light_theme`. A missing value means light (`true`), which is the Windows default for apps (research R7)
+- [X] T004 [P] Add `pub fn primary_work_area() -> Option<Rect>` to `src/platform/shell.rs`: the work area of the monitor at (0, 0) (`MonitorFromPoint(MONITOR_DEFAULTTOPRIMARY)` + `GetMonitorInfoW`), using the existing `from_win`
+- [X] T005 [P] Create `src/domain/widget_place.rs` (register it in `src/domain/mod.rs`). It holds `pub struct WidgetSettings { pub shown: bool, pub position: Option<Point> }` (`Default` = `shown: false, position: None`) and `pub fn default_position(work_area: Rect, size: Size, inset: i32) -> Point`, which returns the top-right corner inset by `inset` on the top and right edges. Unit tests: normal work area; a work area not at the origin (second monitor on the left, negative x); inset 0
+- [X] T006 Create `src/platform/desktop_window.rs` (register it in `src/platform/mod.rs`) with `pub struct DesktopWindow`:
   - **`create(on_event: impl Fn(WidgetEvent) + 'static) -> Result<DesktopWindow, String>`**: registers a window class once and creates a `WS_POPUP` window with `WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE` and **no owner** (research R3).
   - **`present(&mut self, rgba: &[u8], width: u32, height: u32, top_left: Point)`**: converts straight RGBA to premultiplied BGRA into a reused 32-bpp top-down DIB section, re-created only when the size changes, then calls `UpdateLayeredWindow(ULW_ALPHA, AC_SRC_ALPHA, SourceConstantAlpha 255)` at `top_left`.
   - **`show()`** (`ShowWindow(SW_SHOWNOACTIVATE)` then `SetWindowPos(HWND_BOTTOM, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)`), **`hide()`**, and **`rect() -> Option<Rect>`**.
   - **`Drop`**: `DestroyWindow` and frees the DIB.
   - **`pub enum WidgetEvent`**: `Moved(Point)`, `DpiChanged(f32)`, `DisplayChanged`, `DesktopForeground(bool)`. They are only declared here and wired in later tasks.
   - Same safety-comment style as `src/platform/tray.rs`. Every failure is returned as `Err`/ignored; nothing panics.
-- [ ] T007 Create `src/desktop_widget.rs` (`#![deny(unsafe_code)]` inherited; register `mod desktop_widget;` in `src/lib.rs`) with `pub struct DesktopWidget { component: WidgetWindow, window: DesktopWindow, scale: f32, top_left: Point }` and these functions:
+- [X] T007 Create `src/desktop_widget.rs` (`#![deny(unsafe_code)]` inherited; register `mod desktop_widget;` in `src/lib.rs`) with `pub struct DesktopWidget { component: WidgetWindow, window: DesktopWindow, scale: f32, top_left: Point }` and these functions:
   - **`new(top_left, dark) -> Result<Self, String>`**: creates both.
   - **`render(&mut self, snapshot: &Snapshot)`**:
     1. Sets the five properties with the Panel's row builder. Make `metric_row` in `src/ui.rs` `pub(crate)` so both use it (SC-005).
@@ -68,7 +68,7 @@ own layered window. Spike S1 proves it before any behaviour is built on top.
   - **`show()` / `hide()`**.
 
   The scale comes from `shell::scale_for` of the widget rect.
-- [ ] T008 Spike S1 (research R1). In debug builds, `COMPUTER_STATS_TEST_WIDGET=1` turns the Desktop Widget on at start, at `default_position(primary_work_area, …)`; this is wired temporarily in `src/ui.rs` and replaced by T013. Check four things:
+- [X] T008 Spike S1 (research R1). In debug builds, `COMPUTER_STATS_TEST_WIDGET=1` turns the Desktop Widget on at start, at `default_position(primary_work_area, …)`; this is wired temporarily in `src/ui.rs` and replaced by T013. Check four things:
   - (a) text edges show partial alpha over a coloured wallpaper, with no black or white fringe;
   - (b) on a 150 % monitor the widget is 1.5× its logical size and sharp;
   - (c) `render` takes < 2 ms (log `Instant` timings to the crash log once, then remove the logging);
@@ -89,23 +89,23 @@ every window, is never in the taskbar or Alt+Tab, and stays visible on Win+D.
 **Independent Test**: Turn it on from the Tray Menu, run a CPU load, and confirm the widget's CPU
 Usage and Sparkline rise with the Panel closed (W2–W3).
 
-- [ ] T009 [US1] Build the real layout in `ui/widget.slint` per contracts/ui.md:
+- [X] T009 [US1] Build the real layout in `ui/widget.slint` per contracts/ui.md:
   - **`component HaloText`**: a Text drawn first as four ±1 px offset copies in the halo colour, then the main copy; same `text`, `color`, `horizontal-alignment` and `font-size` inputs.
   - **`component HaloMetricRow`**: the same columns and widths as `MetricRow` (label min 80 px, value stretch, secondary 36 px, 60×20 Sparkline). The Sparkline Path is drawn twice: a 3 px halo stroke under the 1.5 px line.
   - **Sections**: "CPU" (Usage, Temperature), "GPU" (Usage, Temperature) and "Memory" (Usage), with the Panel's section font size and gaps.
   - **Colours**, driven by `dark`: dark mode uses content `#ffffff`, muted `#c8c8c8`, halo `#000000` at 70 %; light mode uses content `#1b1b1b`, muted `#424242`, halo `#ffffff` at 70 %. Warning/Critical use the Panel's values for the mode: dark `#f5a623` / `#e5484d`, light `#b26b00` / `#c62828`.
-  - **Window**: background stays `#00000001`, no card (FR-010); width 280 px, height from content (≈ 190 px).
-- [ ] T010 [US1] Add the window behaviour in the `src/platform/desktop_window.rs` window procedure:
+  - **Window**: background stays `#00000001`, no card (FR-010); width 320 px (Spike S1: 280 px cut off the Memory value), height from content (184 px).
+- [X] T010 [US1] Add the window behaviour in the `src/platform/desktop_window.rs` window procedure:
   - `WM_NCHITTEST` → `HTCAPTION` (drag anywhere, FR-015).
   - `WM_MOUSEACTIVATE` → `MA_NOACTIVATE` (FR-005).
   - `WM_WINDOWPOSCHANGING` → force `hwndInsertAfter = HWND_BOTTOM` and clear `SWP_NOZORDER`, unless a `raised` flag is set (FR-004, research R3).
   - Keep `raised` in the window's user data next to the event callback.
-- [ ] T011 [US1] Add the Win+D handling in `src/platform/desktop_window.rs` (research R4). When the window is created, install `SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, None, proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS)`; remove it with `UnhookWinEvent` in `Drop`. In the hook:
-  - When the foreground window's class is `WorkerW` or `Progman`, set `raised` and call `SetWindowPos(HWND_TOP, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)`.
+- [X] T011 [US1] Add the Win+D handling in `src/platform/desktop_window.rs` (research R4). When the window is created, install `SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, None, proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS)`; remove it with `UnhookWinEvent` in `Drop`. In the hook:
+  - When the foreground window's class is `WorkerW` or `Progman` **and it is topmost** (Show desktop, not a plain click on the desktop), set `raised` and call `SetWindowPos(HWND_TOPMOST, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)`.
   - Otherwise, clear `raised` and send it back to `HWND_BOTTOM`.
   - Emit `WidgetEvent::DesktopForeground(bool)` in both cases.
   - Match on class names, not stored HWNDs, so an Explorer restart keeps working.
-- [ ] T012 [US1] Add the Tray Menu item in `src/ui.rs`:
+- [X] T012 [US1] Add the Tray Menu item in `src/ui.rs`:
   - **Menu**: `MENU_DESKTOP_WIDGET = 3`, with "Show desktop widget" as a checkable item between "Start with Windows" and the separator (contracts/ui.md).
   - **State**: add `desktop_widget: Option<DesktopWidget>` to `App`. Toggling builds or drops it. On build, place it at `default_position(primary_work_area, size, 24 logical px × scale)`, call `render(&app.latest)` before `show()` so the first frame already has values, and `dark` = `!theme::apps_use_light_theme()`.
   - **Failure**: if `DesktopWidget::new` fails, the item stays unchecked and the error goes to `crash_log::write` once.
@@ -127,18 +127,18 @@ restarts and monitor changes.
 **Independent Test**: Drag it to the second monitor, restart the app, and confirm it is in the
 same place. Turn it off, restart, and confirm it stays off (W8–W9).
 
-- [ ] T015 [P] [US2] Add `pub fn clamp(top_left: Point, size: Size, work_area: Rect) -> Point` to `src/domain/widget_place.rs`. It returns "the closest position that keeps the whole rectangle inside `work_area`. If `size` is larger than the work area, top-left is pinned to the work area's top-left" (data-model.md). Unit tests: inside → unchanged; off each of the four edges → pulled in; fully off-screen (old monitor) → on the work area; overlapping the taskbar (bottom of the work area) → above it; larger than the work area → pinned
-- [ ] T016 [P] [US2] Create `src/platform/settings.rs` (register it in `src/platform/mod.rs`) with:
+- [X] T015 [P] [US2] Add `pub fn clamp(top_left: Point, size: Size, work_area: Rect) -> Point` to `src/domain/widget_place.rs`. It returns "the closest position that keeps the whole rectangle inside `work_area`. If `size` is larger than the work area, top-left is pinned to the work area's top-left" (data-model.md). Unit tests: inside → unchanged; off each of the four edges → pulled in; fully off-screen (old monitor) → on the work area; overlapping the taskbar (bottom of the work area) → above it; larger than the work area → pinned
+- [X] T016 [P] [US2] Create `src/platform/settings.rs` (register it in `src/platform/mod.rs`) with:
   - `pub fn load() -> WidgetSettings`: reads DWORDs `DesktopWidget` (0/1), `DesktopWidgetX` and `DesktopWidgetY` (i32 stored as two's-complement DWORD) under `HKCU\Software\Computer Stats` with `RegGetValueW`. A missing or unreadable `DesktopWidget` gives `WidgetSettings::default()`, and a missing X or Y gives `position: None` (research R5).
   - `pub fn save_shown(bool)` and `pub fn save_position(Point)` via `RegSetKeyValueW` (`REG_DWORD`). The key is created on first write, and failures are ignored.
-- [ ] T017 [US2] Report moves and display changes from the `src/platform/desktop_window.rs` window procedure:
+- [X] T017 [US2] Report moves and display changes from the `src/platform/desktop_window.rs` window procedure:
   - `WM_EXITSIZEMOVE` → `WidgetEvent::Moved(top-left from GetWindowRect)`.
   - `WM_DISPLAYCHANGE`, and `WM_SETTINGCHANGE` with `wParam == SPI_SETWORKAREA` → `WidgetEvent::DisplayChanged`.
 
   Dispatch through the same deferred path the tray uses, so no App borrow is held during the callback.
-- [ ] T018 [US2] Add `pub fn on_event(&mut self, event: WidgetEvent)` to `src/desktop_widget.rs`. On `Moved` or `DisplayChanged`, it computes `clamp(top_left, size, shell::work_area_for(rect))`. If the result differs, it re-presents at the clamped position (FR-006, FR-008). On `Moved` it then calls `settings::save_position`. `DesktopWidget::new` takes an `Option<Point>`: a saved position is clamped first, and `None` falls back to `default_position`
-- [ ] T019 [US2] Restore and save the setting in `src/ui.rs`. At start, after `APP` is set, call `settings::load()`. If `shown`, build the Desktop Widget at the saved or default position on the first event-loop turn (`slint::Timer::single_shot(Duration::ZERO, …)`). When the item is toggled, call `settings::save_shown`. Route `WidgetEvent`s to `DesktopWidget::on_event` with `update_app`
-- [ ] T020 [P] [US2] Add `Root: HKCU; Subkey: "Software\Computer Stats"; Flags: uninsdeletekey` to a `[Registry]` section in `installer/computer-stats.iss`
+- [X] T018 [US2] Add `pub fn on_event(&mut self, event: WidgetEvent)` to `src/desktop_widget.rs`. On `Moved` or `DisplayChanged`, it computes `clamp(top_left, size, shell::work_area_for(rect))`. If the result differs, it re-presents at the clamped position (FR-006, FR-008). On `Moved` it then calls `settings::save_position`. `DesktopWidget::new` takes an `Option<Point>`: a saved position is clamped first, and `None` falls back to `default_position`
+- [X] T019 [US2] Restore and save the setting in `src/ui.rs`. At start, after `APP` is set, call `settings::load()`. If `shown`, build the Desktop Widget at the saved or default position on the first event-loop turn (`slint::Timer::single_shot(Duration::ZERO, …)`). When the item is toggled, call `settings::save_shown`. Route `WidgetEvent`s to `DesktopWidget::on_event` with `update_app`
+- [X] T020 [P] [US2] Add `Root: HKCU; Subkey: "Software\Computer Stats"; Flags: uninsdeletekey` to a `[Registry]` section in `installer/computer-stats.iss`
 - [ ] T021 [US2] Validate quickstart W7–W9, W11 and W15 and note the results in `specs/005-desktop-widget/quickstart.md`
 
 **Checkpoint**: the widget is "fixed". It comes back where the user left it, on a visible monitor.
@@ -153,8 +153,8 @@ light/dark mode live.
 **Independent Test**: Move it between a 100 % and a 150 % monitor, then switch Windows' mode, and
 confirm it stays sharp, correctly sized and readable (W10, W12).
 
-- [ ] T022 [US3] Handle DPI changes. In `src/platform/desktop_window.rs`, `WM_DPICHANGED` emits `WidgetEvent::DpiChanged(HIWORD(wParam) as f32 / 96.0)`, and the window does not apply the suggested rect itself. In `src/desktop_widget.rs`, `on_event(DpiChanged)` updates `scale`, re-renders at the new size with the top-left kept, then clamps (FR-009). The scale is also re-read with `shell::scale_for` after `Moved`, for drops across monitors without a `WM_DPICHANGED`
-- [ ] T023 [US3] Follow the theme. In `src/ui.rs`, the existing `TrayEvent::AppearanceChanged` handler also calls `desktop_widget.set_dark(!theme::apps_use_light_theme())` when the widget is on. Add `set_dark(bool)` to `src/desktop_widget.rs`; it sets the property and re-renders immediately (US3 scenario 3)
+- [X] T022 [US3] Handle DPI changes. In `src/platform/desktop_window.rs`, `WM_DPICHANGED` emits `WidgetEvent::DpiChanged(HIWORD(wParam) as f32 / 96.0)`, and the window does not apply the suggested rect itself. In `src/desktop_widget.rs`, `on_event(DpiChanged)` updates `scale`, re-renders at the new size with the top-left kept, then clamps (FR-009). The scale is also re-read with `shell::scale_for` after `Moved`, for drops across monitors without a `WM_DPICHANGED`
+- [X] T023 [US3] Follow the theme. In `src/ui.rs`, the existing `TrayEvent::AppearanceChanged` handler also calls `desktop_widget.set_dark(!theme::apps_use_light_theme())` when the widget is on. Add `set_dark(bool)` to `src/desktop_widget.rs`; it sets the property and re-renders immediately (US3 scenario 3)
 - [ ] T024 [US3] Validate quickstart W10, W12 and W13 (white, black and busy-photo wallpapers in both modes, SC-008) and note the results in `specs/005-desktop-widget/quickstart.md`. If any value is unreadable, adjust the halo alpha or offset in `ui/widget.slint` and record the final values in contracts/ui.md
 
 **Checkpoint**: all three user stories work.
@@ -163,10 +163,10 @@ confirm it stays sharp, correctly sized and readable (W10, W12).
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T025 Run the gates: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo deny check`, `cargo test`. Confirm `unsafe` appears only under `src/platform/`, there is no `unwrap`/`expect` outside tests, and with the widget off no `DesktopWindow`, WinEvent hook or `WidgetWindow` exists
+- [X] T025 Run the gates: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo deny check`, `cargo test`. Confirm `unsafe` appears only under `src/platform/`, there is no `unwrap`/`expect` outside tests, and with the widget off no `DesktopWindow`, WinEvent hook or `WidgetWindow` exists
 - [ ] T026 Measure with `scripts/measure.ps1` (W16): 10 minutes with the widget on and the Panel closed, then the widget off and the Panel closed. Record both in `specs/005-desktop-widget/measurements.md`. Budgets: ≤ 30 MB private working set and < 0.5 % CPU with the widget on; widget off unchanged from 0.2.0; exe ≤ 10 MB
-- [ ] T027 [P] Update `README.md`: a Features bullet for the optional Desktop Widget (transparent, stays behind windows, remembers its place); a row in "How to use" for "Right-click the tray icon → Show desktop widget"; and the memory/CPU line if T026 changed it
-- [ ] T028 [P] Update the **Tray Menu** entry in `CONTEXT.md` to list "Start with Windows, Show desktop widget, Quit"
+- [X] T027 [P] Update `README.md`: a Features bullet for the optional Desktop Widget (transparent, stays behind windows, remembers its place); a row in "How to use" for "Right-click the tray icon → Show desktop widget"; and the memory/CPU line if T026 changed it
+- [X] T028 [P] Update the **Tray Menu** entry in `CONTEXT.md` to list "Start with Windows, Show desktop widget, Quit"
 
 ---
 

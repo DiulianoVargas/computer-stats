@@ -15,7 +15,7 @@ The visualizer's icon in the Windows system tray (next to the clock). It is the 
 _Avoid_: Taskbar icon, task manager icon
 
 **Tray Menu**:
-The small right-click menu on the Tray Icon holding app-level options (Start with Windows, Quit). Never shows Metrics.
+The small right-click menu on the Tray Icon holding app-level options (Start with Windows, Show desktop widget, Quit). Never shows Metrics.
 _Avoid_: Context menu, settings
 
 **Start with Windows**:

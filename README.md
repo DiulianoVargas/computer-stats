@@ -33,6 +33,9 @@ bloated or full of ads. Computer Stats lives in the system tray, uses about **4 
   notice it without opening anything. No pop-ups, no sounds.
 - **Processes tab** — every running program with its icon, CPU and memory use, sorted by CPU or
   memory. Click **End**, then **Confirm?**, to close a program that is stuck or hogging the PC.
+- **Desktop widget (optional)** — CPU, GPU and memory with their graphs, drawn straight on your
+  wallpaper. Turn it on from the tray menu and drag it anywhere. It stays behind your windows
+  and comes back where you left it. Off by default.
 - **Start with Windows** — one click in the tray menu; starts at sign-in without a UAC prompt.
 - **Light and dark theme**, any taskbar position, multiple monitors and high-DPI screens.
 - **Native and lightweight** — written in Rust with a natively rendered UI: no browser engine, no
@@ -64,7 +67,8 @@ run `computer-stats.exe` (install PawnIO from [pawnio.eu](https://pawnio.eu) for
 | Click **End**, then **Confirm?** within 3 s | Close a program (all its processes) |
 | Click outside the Panel or press **Esc** | Close the Panel |
 | **Hover** the tray icon | See which value needs attention |
-| **Right-click** the tray icon | *Start with Windows* or *Quit* |
+| **Right-click** the tray icon | *Start with Windows*, *Show desktop widget* or *Quit* |
+| **Drag** the desktop widget | Move it; it remembers the place |
 
 ### Warning levels
 

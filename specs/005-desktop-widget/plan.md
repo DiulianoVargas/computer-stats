@@ -24,7 +24,8 @@ the taskbar.
 - **Click and drag:** `WM_NCHITTEST → HTCAPTION` gives native dragging, and `WS_EX_NOACTIVATE`
   keeps it from taking focus.
 - **Stays behind:** a `WM_WINDOWPOSCHANGING` guard pins it to `HWND_BOTTOM`.
-- **Win+D:** a WinEvent foreground hook raises it while the desktop is in front.
+- **Win+D:** a WinEvent foreground hook raises it while Show desktop holds the desktop in
+  front.
 - **Position:** placement is clamped to the nearest monitor's work area. On/off and position
   persist in `HKCU\Software\Computer Stats`.
 
@@ -129,7 +130,7 @@ Cargo.toml                # + Win32_UI_Accessibility
    - both exported components generated from `panel.slint`.
 
    Fallback: a cloaked shown Slint window (R1).
-2. **Spike S2 (Win+D)**: the foreground hook plus `HWND_TOP` raise, on Windows 11 24H2+ and
+2. **Spike S2 (Win+D)**: the foreground hook plus `HWND_TOPMOST` raise, on Windows 11 24H2+ and
    Windows 10 22H2. The result decides whether FR-014's fallback path is the norm on some builds.
    It is recorded in `research.md`.
 3. Pure `widget_place` with tests, then settings, then the full window behaviour (R2, R3, R6),

@@ -9,6 +9,7 @@ use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 
 use crate::crash_log;
+use crate::desktop_widget::DesktopWidget;
 use crate::domain::anchor::{self, Size};
 use crate::domain::app_order::Sort;
 use crate::domain::format;
@@ -17,10 +18,11 @@ use crate::domain::sparkline;
 use crate::domain::tray_art::{self, TrayTheme};
 use crate::domain::warning::WarningLevel;
 use crate::generated::{DriveRowData, MetricRowData, PanelWindow};
+use crate::platform::desktop_window::WidgetEvent;
 use crate::platform::instance::{self, Instance};
-use crate::platform::shell;
 use crate::platform::theme;
 use crate::platform::tray::{self, MenuEntry, TrayEvent, TrayIcon};
+use crate::platform::{settings, shell};
 use crate::processes_ui::{self, EndResult, ProcessesUi};
 use crate::sampler::{self, SamplerHandle};
 use crate::snapshot::{DriveState, MetricState, Snapshot};
@@ -32,6 +34,7 @@ const TOGGLE_GUARD: Duration = Duration::from_millis(300);
 
 const MENU_START_WITH_WINDOWS: u32 = 1;
 const MENU_QUIT: u32 = 2;
+const MENU_DESKTOP_WIDGET: u32 = 3;
 
 /// Logical width, as in `ui/panel.slint`.
 const PANEL_WIDTH: f32 = 320.0;
@@ -61,6 +64,8 @@ struct App {
     /// The selected View, remembered while the app runs (003 FR-002).
     view: View,
     processes: ProcessesUi,
+    /// The Desktop Widget, only while the user has it on (005 FR-001).
+    desktop_widget: Option<DesktopWidget>,
 }
 
 thread_local! {
@@ -222,10 +227,18 @@ pub fn run() -> Result<(), String> {
             sampler,
             view: initial_view(),
             processes,
+            desktop_widget: None,
         })
     });
 
     with_app(|app| app.panel.set_view(app.view as i32));
+
+    // Restore the Desktop Widget as it was at quit (005 FR-007), once the event loop runs.
+    if settings::load().shown {
+        slint::Timer::single_shot(Duration::ZERO, || {
+            update_app(move |app| app.set_desktop_widget(true));
+        });
+    }
 
     let result = slint::run_event_loop_until_quit().map_err(|e| e.to_string());
 
@@ -249,6 +262,10 @@ fn on_snapshot(mut snapshot: Snapshot) {
         }
         app.latest = snapshot;
         app.update_icon();
+        // Live whenever it is on, Panel open or not (005 FR-003).
+        if let Some(widget) = app.desktop_widget.as_mut() {
+            widget.update(&app.latest);
+        }
         // Panel properties change only while it is visible (Constitution I).
         if app.visible {
             app.push_snapshot();
@@ -273,10 +290,15 @@ fn on_tray_event(event: TrayEvent) {
             update_app(move |app| {
                 let wanted = (app.icon.0, tray_theme(), app.tray.icon_size());
                 app.update_icon_to(wanted);
+                if let Some(widget) = app.desktop_widget.as_mut() {
+                    widget.set_dark(!theme::apps_use_light_theme());
+                }
             });
         }
         TrayEvent::ContextMenu { x, y } => {
-            let checked = with_app(|app| app.start_with_windows).unwrap_or(false);
+            let (checked, widget_shown) =
+                with_app(|app| (app.start_with_windows, app.desktop_widget.is_some()))
+                    .unwrap_or((false, false));
             // No App borrow across the menu's modal loop: snapshots keep arriving meanwhile.
             let chosen = tray::show_menu(
                 x,
@@ -286,6 +308,11 @@ fn on_tray_event(event: TrayEvent) {
                         id: MENU_START_WITH_WINDOWS,
                         text: "Start with Windows",
                         checked: Some(checked),
+                    },
+                    MenuEntry::Item {
+                        id: MENU_DESKTOP_WIDGET,
+                        text: "Show desktop widget",
+                        checked: Some(widget_shown),
                     },
                     MenuEntry::Separator,
                     MenuEntry::Item {
@@ -307,6 +334,13 @@ fn on_tray_event(event: TrayEvent) {
                         update_app(move |app| app.start_with_windows = !checked);
                     }
                 }
+                Some(MENU_DESKTOP_WIDGET) => {
+                    update_app(move |app| {
+                        app.set_desktop_widget(!widget_shown);
+                        // The check mark shows the actual state (contracts/ui.md).
+                        settings::save_shown(app.desktop_widget.is_some());
+                    });
+                }
                 Some(MENU_QUIT) => {
                     let _ = slint::quit_event_loop();
                 }
@@ -316,7 +350,35 @@ fn on_tray_event(event: TrayEvent) {
     }
 }
 
+fn on_widget_event(event: WidgetEvent) {
+    update_app(move |app| {
+        if let Some(widget) = app.desktop_widget.as_mut() {
+            widget.on_event(event);
+        }
+    });
+}
+
 impl App {
+    /// Turns the Desktop Widget on or off. If it cannot be created it stays off; the tray and
+    /// Panel are unaffected (005 FR-013).
+    fn set_desktop_widget(&mut self, on: bool) {
+        if on == self.desktop_widget.is_some() {
+            return;
+        }
+        if !on {
+            self.desktop_widget = None;
+            return;
+        }
+        let saved = settings::load().position;
+        match DesktopWidget::new(saved, !theme::apps_use_light_theme(), on_widget_event) {
+            Ok(mut widget) => {
+                widget.show(&self.latest);
+                self.desktop_widget = Some(widget);
+            }
+            Err(e) => crash_log::write(&format!("desktop widget failed: {e}")),
+        }
+    }
+
     fn toggle(&mut self) {
         if self.visible {
             self.hide();
@@ -438,7 +500,8 @@ impl App {
     }
 }
 
-fn metric_row(state: &MetricState) -> MetricRowData {
+/// The row the Panel and the Desktop Widget show for one Metric (005 SC-005).
+pub(crate) fn metric_row(state: &MetricState) -> MetricRowData {
     let label = match state.kind {
         MetricKind::CpuUsage | MetricKind::GpuUsage | MetricKind::MemoryUsage => "Usage",
         MetricKind::CpuTemperature | MetricKind::GpuTemperature => "Temperature",
