@@ -63,7 +63,10 @@ Name: "{autoprograms}\Computer Stats"; Filename: "{app}\computer-stats.exe"
 Name: "{autodesktop}\Computer Stats"; Filename: "{app}\computer-stats.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\computer-stats.exe"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
+; shellexec: postinstall entries run as the original, non-elevated user, and CreateProcess cannot
+; start an exe whose manifest asks for elevation (error 740). ShellExecute shows the UAC prompt,
+; like the Start menu shortcut does.
+Filename: "{app}\computer-stats.exe"; Description: "{cm:LaunchApp}"; Flags: shellexec nowait postinstall skipifsilent
 Filename: "https://pawnio.eu"; Description: "{cm:GetPawnIO}"; Flags: shellexec postinstall skipifsilent unchecked
 
 [UninstallRun]
