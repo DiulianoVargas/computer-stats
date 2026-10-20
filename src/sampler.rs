@@ -14,6 +14,7 @@ use crate::platform::cpu::CpuTimes;
 use crate::platform::gpu::{GpuReadings, GpuSource};
 use crate::platform::pawnio::CpuTemperatureSource;
 use crate::platform::{drives, memory};
+use crate::process_sampler::ProcessSampler;
 use crate::snapshot::{APP_NAME, DriveState, MetricState, Snapshot};
 
 const TICK: Duration = Duration::from_secs(1);
@@ -36,6 +37,10 @@ struct Sampler {
     histories: [History; 6],
     /// Wall-clock time of the previous tick, to detect sleep (FR-021).
     previous_tick: Option<SystemTime>,
+    /// Present only while the Processes View is visible (003 FR-018).
+    processes: Option<ProcessSampler>,
+    /// The last Snapshot, reused for an immediate Processes-only tick.
+    last: Option<Snapshot>,
 }
 
 impl Sampler {
@@ -50,7 +55,26 @@ impl Sampler {
             drive_levels: BTreeMap::new(),
             histories: Default::default(),
             previous_tick: None,
+            processes: None,
+            last: None,
         }
+    }
+
+    /// Starts or stops Processes sampling. Stopping drops its buffer and caches.
+    fn set_processes_visible(&mut self, visible: bool) {
+        if visible {
+            self.processes.get_or_insert_with(ProcessSampler::new);
+        } else {
+            self.processes = None;
+        }
+    }
+
+    /// An extra tick right after the Processes View opens: fresh Processes, the last Metrics
+    /// (sampling Metrics twice in one second would skew Sparklines and hysteresis).
+    fn processes_only_tick(&mut self) -> Option<Snapshot> {
+        let mut snapshot = self.last.clone()?;
+        snapshot.processes = self.processes.as_mut().and_then(ProcessSampler::sample);
+        Some(snapshot)
     }
 
     /// One tick. Must never panic (Constitution VIII).
@@ -99,12 +123,18 @@ impl Sampler {
                 })
                 .collect::<Vec<_>>(),
         );
-        Snapshot {
+        let snapshot = Snapshot {
             metrics,
             drives,
             tooltip: status_dot::tooltip(APP_NAME, &dot),
             status_dot: dot,
-        }
+            processes: self.processes.as_mut().and_then(ProcessSampler::sample),
+        };
+        self.last = Some(Snapshot {
+            processes: None,
+            ..snapshot.clone()
+        });
+        snapshot
     }
 
     /// Seconds with no tick since the previous one (the PC slept): wall-clock gaps above 1.5 s
@@ -180,16 +210,22 @@ fn offset(t: Thresholds) -> Thresholds {
     t
 }
 
-/// Stops the sampler thread when `stop()` is called or when dropped.
+/// Messages from the UI thread to the sampler.
+enum Command {
+    /// Start or stop sampling Processes (the Processes View was shown or hidden).
+    ProcessesVisible(bool),
+}
+
+/// Stops the sampler thread when `stop()` is called or when dropped (dropping the sender stops it).
 pub struct SamplerHandle {
-    stop: Option<Sender<()>>,
+    stop: Option<Sender<Command>>,
     done: mpsc::Receiver<()>,
     thread: Option<JoinHandle<()>>,
 }
 
 /// Starts sampling; `on_snapshot` is called on the sampler thread once per second.
 pub fn spawn(on_snapshot: impl Fn(Snapshot) + Send + 'static) -> std::io::Result<SamplerHandle> {
-    let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let (stop_tx, stop_rx) = mpsc::channel::<Command>();
     let (done_tx, done_rx) = mpsc::channel::<()>();
     let thread = std::thread::Builder::new()
         .name("sampler".into())
@@ -205,8 +241,8 @@ pub fn spawn(on_snapshot: impl Fn(Snapshot) + Send + 'static) -> std::io::Result
     })
 }
 
-/// Ticks until `stop` is signalled or disconnected.
-fn run(on_snapshot: &impl Fn(Snapshot), stop: &mpsc::Receiver<()>) {
+/// Ticks until the command channel is disconnected.
+fn run(on_snapshot: &impl Fn(Snapshot), commands: &mpsc::Receiver<Command>) {
     let mut sampler = Sampler::new();
     let mut deadline = Instant::now();
     loop {
@@ -217,14 +253,31 @@ fn run(on_snapshot: &impl Fn(Snapshot), stop: &mpsc::Receiver<()>) {
         if deadline <= now {
             deadline = now + TICK;
         }
-        match stop.recv_timeout(deadline - now) {
-            Err(RecvTimeoutError::Timeout) => continue,
-            Ok(()) | Err(RecvTimeoutError::Disconnected) => return,
+        // Commands may arrive before the deadline; keep waiting for it afterwards.
+        loop {
+            let wait = deadline.saturating_duration_since(Instant::now());
+            match commands.recv_timeout(wait) {
+                Err(RecvTimeoutError::Timeout) => break,
+                Err(RecvTimeoutError::Disconnected) => return,
+                Ok(Command::ProcessesVisible(visible)) => {
+                    sampler.set_processes_visible(visible);
+                    if visible && let Some(snapshot) = sampler.processes_only_tick() {
+                        on_snapshot(snapshot);
+                    }
+                }
+            }
         }
     }
 }
 
 impl SamplerHandle {
+    /// Starts (immediately, with one extra Snapshot) or stops Processes sampling.
+    pub fn set_processes_visible(&self, visible: bool) {
+        if let Some(tx) = &self.stop {
+            let _ = tx.send(Command::ProcessesVisible(visible));
+        }
+    }
+
     /// Signals the thread and waits up to 2 s for it to finish; past that it is left to the OS.
     pub fn stop(&mut self) {
         self.stop.take();
@@ -264,5 +317,27 @@ mod tests {
         }
         assert!(started.elapsed() < Duration::from_millis(500));
         assert_eq!(count.lock().map(|n| *n).ok(), Some(1));
+    }
+
+    #[test]
+    fn processes_visible_ticks_at_once_with_processes() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let s = Arc::clone(&seen);
+        let Ok(mut handle) = spawn(move |snapshot| {
+            if let Ok(mut v) = s.lock() {
+                v.push(snapshot.processes.map(|p| p.apps.len()));
+            }
+        }) else {
+            return;
+        };
+        std::thread::sleep(Duration::from_millis(150));
+        handle.set_processes_visible(true);
+        std::thread::sleep(Duration::from_millis(400));
+        handle.stop();
+        let seen = seen.lock().map(|v| v.clone()).unwrap_or_default();
+        // The first tick had no Processes; the extra one, well before the next second, has them.
+        assert_eq!(seen.len(), 2, "{seen:?}");
+        assert_eq!(seen[0], None);
+        assert!(seen[1].is_some_and(|n| n > 10));
     }
 }

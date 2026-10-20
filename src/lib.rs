@@ -5,6 +5,8 @@
 pub mod domain;
 #[allow(unsafe_code)]
 mod platform;
+mod process_sampler;
+mod processes_ui;
 mod sampler;
 mod snapshot;
 mod startup;

@@ -9,6 +9,7 @@ use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, SharedString, VecModel};
 
 use crate::domain::anchor::{self, Size};
+use crate::domain::app_order::Sort;
 use crate::domain::format;
 use crate::domain::metric::{MetricKind, Reading, Reason};
 use crate::domain::sparkline;
@@ -19,7 +20,8 @@ use crate::platform::instance::{self, Instance};
 use crate::platform::shell;
 use crate::platform::theme;
 use crate::platform::tray::{self, MenuEntry, TrayEvent, TrayIcon};
-use crate::sampler;
+use crate::processes_ui::{self, EndResult, ProcessesUi};
+use crate::sampler::{self, SamplerHandle};
 use crate::snapshot::{DriveState, MetricState, Snapshot};
 use crate::startup;
 
@@ -32,6 +34,13 @@ const MENU_QUIT: u32 = 2;
 
 /// Logical width, as in `ui/panel.slint`.
 const PANEL_WIDTH: f32 = 320.0;
+
+/// The Panel's Views; values match `view` in `ui/panel.slint`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum View {
+    Metrics = 0,
+    Processes = 1,
+}
 
 /// Everything the UI thread owns. Lives in a thread-local so callbacks queued from other threads
 /// (`invoke_from_event_loop` requires `Send`) can reach it.
@@ -47,6 +56,10 @@ struct App {
     placed_height: f32,
     /// Start with Windows as last read from or written to Task Scheduler (FR-005).
     start_with_windows: bool,
+    sampler: SamplerHandle,
+    /// The selected View, remembered while the app runs (003 FR-002).
+    view: View,
+    processes: ProcessesUi,
 }
 
 thread_local! {
@@ -86,6 +99,36 @@ pub fn run() -> Result<(), String> {
     panel.on_close_requested(|| {
         with_app(|app| app.hide());
     });
+    panel.on_view_changed(|view| {
+        with_app(|app| {
+            app.set_view(if view == 1 {
+                View::Processes
+            } else {
+                View::Metrics
+            })
+        });
+    });
+    panel.on_sort_clicked(|column| {
+        with_app(|app| {
+            let sort = if column == 1 { Sort::Memory } else { Sort::Cpu };
+            app.processes.set_sort(sort);
+            app.panel.set_sort(column);
+        });
+    });
+    panel.on_end_clicked(|key| {
+        let result = with_app(|app| app.processes.end_clicked(&key));
+        if let Some(EndResult::Quit) = result {
+            let _ = slint::quit_event_loop();
+            return;
+        }
+        // Expire arming and row feedback later (FR-012, FR-016).
+        slint::Timer::single_shot(processes_ui::expire_after(), || {
+            with_app(|app| app.processes.expire());
+        });
+    });
+    panel.on_background_clicked(|| {
+        with_app(|app| app.processes.cancel_arming());
+    });
     // Click outside: the Panel loses focus (FR-008). Handled after winit's dispatch returns.
     panel.window().on_winit_window_event(|_, event| {
         if let WindowEvent::Focused(false) = event {
@@ -101,6 +144,14 @@ pub fn run() -> Result<(), String> {
         EventResult::Propagate
     });
 
+    let sampler = sampler::spawn(|snapshot| {
+        let _ = slint::invoke_from_event_loop(move || on_snapshot(snapshot));
+    })
+    .map_err(|e| e.to_string())?;
+
+    let processes = ProcessesUi::new();
+    panel.set_apps(processes.model());
+
     APP.with_borrow_mut(|app| {
         *app = Some(App {
             panel,
@@ -111,25 +162,34 @@ pub fn run() -> Result<(), String> {
             hidden_by_deactivation: None,
             placed_height: 0.0,
             start_with_windows: startup::is_enabled(),
+            sampler,
+            view: initial_view(),
+            processes,
         })
     });
 
-    let mut sampler = sampler::spawn(|snapshot| {
-        let _ = slint::invoke_from_event_loop(move || on_snapshot(snapshot));
-    })
-    .map_err(|e| e.to_string())?;
+    with_app(|app| app.panel.set_view(app.view as i32));
 
     let result = slint::run_event_loop_until_quit().map_err(|e| e.to_string());
 
-    sampler.stop();
-    // Dropping the App removes the Tray Icon.
-    APP.with_borrow_mut(|app| app.take());
+    // Dropping the App stops the sampler and removes the Tray Icon.
+    if let Some(mut app) = APP.with_borrow_mut(|app| app.take()) {
+        app.sampler.stop();
+    }
     result
 }
 
-fn on_snapshot(snapshot: Snapshot) {
+fn on_snapshot(mut snapshot: Snapshot) {
     with_app(|app| {
         app.tray.set_tooltip(&snapshot.tooltip);
+        if let Some(sample) = snapshot.processes.take()
+            && app.visible
+            && app.view == View::Processes
+        {
+            let hovered = app.panel.get_apps_hovered();
+            app.processes.apply(sample, hovered);
+            app.panel.set_apps_loading(false);
+        }
         app.latest = snapshot;
         app.update_icon();
         // Panel properties change only while it is visible (Constitution I).
@@ -223,6 +283,9 @@ impl App {
         }
         self.visible = true;
         self.hidden_by_deactivation = None;
+        if self.view == View::Processes {
+            self.sampler.set_processes_visible(true);
+        }
         // The winit window, and with it the Drive rows' height, may only exist after this
         // event-loop turn; re-place and focus it then.
         let _ = slint::invoke_from_event_loop(|| {
@@ -276,6 +339,30 @@ impl App {
     fn hide(&mut self) {
         let _ = self.panel.hide();
         self.visible = false;
+        self.stop_processes();
+    }
+
+    /// Switches View (003 FR-001): Processes are sampled only while their View is visible.
+    fn set_view(&mut self, view: View) {
+        self.view = view;
+        self.panel.set_view(view as i32);
+        if view == View::Processes {
+            self.sampler.set_processes_visible(true);
+        } else {
+            self.stop_processes();
+        }
+        self.place_if_resized();
+    }
+
+    /// Stops Processes sampling and drops the View's data (FR-018); arming is cancelled.
+    fn stop_processes(&mut self) {
+        self.sampler.set_processes_visible(false);
+        self.processes.clear();
+        self.panel.set_apps_loading(true);
+        self.panel.set_sort(match self.processes.sort() {
+            Sort::Cpu => 0,
+            Sort::Memory => 1,
+        });
     }
 
     fn push_snapshot(&self) {
@@ -354,6 +441,18 @@ fn level_index(level: Option<WarningLevel>) -> i32 {
         Some(WarningLevel::Critical) => 2,
         Some(WarningLevel::Warning) => 1,
         _ => 0,
+    }
+}
+
+/// Metrics at launch (003 FR-001). Debug builds accept `COMPUTER_STATS_TEST_VIEW=processes` to
+/// open on the Processes View, for manual tests without clicking the tab.
+fn initial_view() -> View {
+    if cfg!(debug_assertions)
+        && std::env::var("COMPUTER_STATS_TEST_VIEW").is_ok_and(|v| v == "processes")
+    {
+        View::Processes
+    } else {
+        View::Metrics
     }
 }
 

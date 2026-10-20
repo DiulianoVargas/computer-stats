@@ -8,6 +8,12 @@ use windows::core::w;
 
 use super::tray::WINDOW_CLASS;
 
+/// Debug builds use their own name, so a development build can run next to an installed one.
+#[cfg(not(debug_assertions))]
+const MUTEX_NAME: windows::core::PCWSTR = w!("Local\\ComputerStats.SingleInstance");
+#[cfg(debug_assertions)]
+const MUTEX_NAME: windows::core::PCWSTR = w!("Local\\ComputerStats.SingleInstance.Debug");
+
 /// Held for the process lifetime; Windows releases the mutex when the process exits.
 pub struct InstanceGuard {
     _mutex: HANDLE,
@@ -28,7 +34,7 @@ pub fn open_panel_message() -> u32 {
 pub fn acquire() -> Instance {
     // SAFETY: literal, NUL-terminated name; GetLastError is read right after the call.
     let (mutex, error) = unsafe {
-        let mutex = CreateMutexW(None, true, w!("Local\\ComputerStats.SingleInstance"));
+        let mutex = CreateMutexW(None, true, MUTEX_NAME);
         (mutex, GetLastError())
     };
     // An elevated instance's mutex may deny a non-elevated process: that is still "running".

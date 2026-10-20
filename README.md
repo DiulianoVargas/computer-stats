@@ -15,6 +15,10 @@ defined in [`CONTEXT.md`](CONTEXT.md); principles in
   through a scheduled task named "Computer Stats") and *Quit*.
 - Reads GPU Metrics from Windows itself (as Task Manager does; ADR-0003), so it works with any
   dedicated GPU and loads no vendor library. Integrated graphics are ignored.
+- **Processes View** (the Panel's second tab): every running App with its icon, Process count,
+  CPU and memory, sorted by CPU or memory. **End** turns into **Confirm?** for 3 seconds; a second
+  click forcibly ends every Process of that App. Any App can be ended, including Windows' own
+  programs and services: ending those can make Windows unstable or restart it.
 - Launching it again while it runs opens the existing Panel.
 
 ## Build
@@ -35,7 +39,8 @@ built exe from an **elevated** terminal during development.
 During development, `$env:__COMPAT_LAYER = 'RunAsInvoker'` starts the exe without elevation (CPU
 Temperature then shows `— not elevated`). Debug builds accept
 `COMPUTER_STATS_TEST_THRESHOLD_OFFSET=<n>` to lower every Warning threshold by `n` and see the
-colors without loading the PC.
+colors without loading the PC, and `COMPUTER_STATS_TEST_VIEW=processes` to open on the Processes
+View; they also use their own single-instance lock, so they run next to an installed copy.
 
 CPU Temperature needs the PawnIO driver (Official edition) and `AMDFamily17.bin` copied next to the
 executable (see `specs/001-cpu-temp-spike/quickstart.md`). GPU Metrics need a dedicated GPU and its

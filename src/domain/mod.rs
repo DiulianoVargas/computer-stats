@@ -1,8 +1,11 @@
 //! Pure domain logic: no I/O, no unsafe. Everything here is unit-tested.
 
 pub mod anchor;
+pub mod app_order;
+pub mod apps;
 pub mod cpu_temp;
 pub mod drive;
+pub mod end_confirm;
 pub mod format;
 pub mod gpu;
 pub mod history;
