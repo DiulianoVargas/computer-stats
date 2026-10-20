@@ -3,8 +3,8 @@
     Builds the release exe and packages it as an installer and a portable zip.
 .DESCRIPTION
     1. cargo build --release (static CRT, icon and version embedded).
-    2. Downloads PawnIO.Modules $ModulesVersion and checks AMDFamily17.bin's SHA-256 against the
-       copy validated in spike 001.
+    2. Downloads PawnIO.Modules $ModulesVersion and checks the SHA-256 of the CPU Temperature
+       modules (AMDFamily17.bin, IntelMSR.bin) against pinned values.
     3. Collects third-party notices: Slint, PawnIO.Modules (LGPL-2.1 + source link), and the
        license files of every Rust crate in the build.
     4. Compiles installer/computer-stats.iss with Inno Setup into dist\.
@@ -14,7 +14,11 @@
 #>
 param(
     [string]$ModulesVersion = '0.2.11',
-    [string]$ModuleSha256 = 'DAE74615761B78BDF064DFB3E136252DDCC6FC727D88F14738D0E5800D427A91',
+    # SHA-256 of each module in PawnIO.Modules $ModulesVersion's release zip (AMD: validated in spike 001).
+    [hashtable]$ModuleSha256 = @{
+        'AMDFamily17.bin' = 'DAE74615761B78BDF064DFB3E136252DDCC6FC727D88F14738D0E5800D427A91'
+        'IntelMSR.bin'    = 'D6ED85D65AB17A22F813EF98207D6D537155EE2DED5976A21CB48413C9B92E5F'
+    },
     [string]$Iscc = (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
 )
 
@@ -48,11 +52,13 @@ if (-not (Test-Path $zip)) {
 $extract = Join-Path $work 'modules-extract'
 Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive $zip $extract
-$module = Get-ChildItem $extract -Recurse -Filter AMDFamily17.bin | Select-Object -First 1
-if (-not $module) { throw 'AMDFamily17.bin not found in the PawnIO.Modules release' }
-$hash = (Get-FileHash $module.FullName -Algorithm SHA256).Hash
-if ($hash -ne $ModuleSha256) { throw "AMDFamily17.bin hash $hash differs from the validated $ModuleSha256" }
-Copy-Item $module.FullName "$work\module\AMDFamily17.bin" -Force
+foreach ($name in $ModuleSha256.Keys) {
+    $module = Get-ChildItem $extract -Recurse -Filter $name | Select-Object -First 1
+    if (-not $module) { throw "$name not found in the PawnIO.Modules release" }
+    $hash = (Get-FileHash $module.FullName -Algorithm SHA256).Hash
+    if ($hash -ne $ModuleSha256[$name]) { throw "$name hash $hash differs from the pinned $($ModuleSha256[$name])" }
+    Copy-Item $module.FullName "$work\module\$name" -Force
+}
 
 # 3. Third-party notices
 $licenseUrl = "https://raw.githubusercontent.com/namazso/PawnIO.Modules/$ModulesVersion/COPYING"
@@ -100,11 +106,12 @@ Slint (https://slint.dev)
   Used under the Slint Royalty-free Desktop, Mobile, and Web Applications License 2.0:
   https://slint.dev/terms-and-conditions#royalty-free
 
-PawnIO.Modules $ModulesVersion - AMDFamily17.bin (used for CPU Temperature)
+PawnIO.Modules $ModulesVersion - AMDFamily17.bin and IntelMSR.bin (used for CPU Temperature)
   Copyright (c) namazso. Licensed under the GNU Lesser General Public License v2.1
   (licenses\PawnIO.Modules-LGPL-2.1.txt). Unmodified; source code:
   https://github.com/namazso/PawnIO.Modules/tree/$ModulesVersion
-  The PawnIO driver is not included; install it from https://pawnio.eu to see CPU Temperature.
+  The PawnIO driver is not included; the installer can download and install the official setup
+  from its publisher, or install it from https://pawnio.eu to see CPU Temperature.
 
 Rust crates
   See licenses\rust-crates.txt for each crate's name, version, license and license text.
@@ -120,7 +127,7 @@ Move-Item "$work\ComputerStats-Setup-$version.exe" "$dist\ComputerStats-Setup-$v
 $portable = Join-Path $work 'portable\Computer Stats'
 Remove-Item (Split-Path $portable) -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force "$portable\licenses" | Out-Null
-Copy-Item $exe, "$work\module\AMDFamily17.bin", "$work\THIRD-PARTY-NOTICES.txt" $portable
+Copy-Item $exe, "$work\module\*.bin", "$work\THIRD-PARTY-NOTICES.txt" $portable
 Copy-Item "$work\licenses\*" "$portable\licenses"
 $zipOut = "$dist\ComputerStats-$version-portable.zip"
 Remove-Item $zipOut -ErrorAction SilentlyContinue

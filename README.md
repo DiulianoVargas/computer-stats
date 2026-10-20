@@ -42,8 +42,10 @@ Temperature then shows `— not elevated`). Debug builds accept
 colors without loading the PC, and `COMPUTER_STATS_TEST_VIEW=processes` to open on the Processes
 View; they also use their own single-instance lock, so they run next to an installed copy.
 
-CPU Temperature needs the PawnIO driver (Official edition) and `AMDFamily17.bin` copied next to the
-executable (see `specs/001-cpu-temp-spike/quickstart.md`). GPU Metrics need a dedicated GPU and its
+CPU Temperature needs the PawnIO driver (Official edition) and the module for the CPU next to the
+executable: `AMDFamily17.bin` for AMD Ryzen, `IntelMSR.bin` for Intel (both from PawnIO.Modules;
+see `specs/001-cpu-temp-spike/quickstart.md`). The installer ships both modules and can install
+PawnIO itself. GPU Metrics need a dedicated GPU and its
 driver (GPU Temperature only if the driver reports it to Windows, as in Task Manager). Without them, those Metrics show `—` with a reason and everything else keeps working.
 
 Resource budgets (Constitution I):
@@ -68,8 +70,10 @@ Produces in `dist\`:
 - `ComputerStats-<version>-portable.zip`: unzip and run `computer-stats.exe`.
 
 The exe has no runtime dependencies beyond Windows (static C runtime). Both packages include
-`AMDFamily17.bin` (PawnIO.Modules, LGPL-2.1, hash-checked) and the third-party notices; the PawnIO
-driver itself must be installed separately for CPU Temperature. The packages are not code-signed,
+`AMDFamily17.bin` and `IntelMSR.bin` (PawnIO.Modules, LGPL-2.1, hash-checked) and the third-party
+notices. The PawnIO driver is not bundled: when it is missing, the installer offers (ticked) to
+download the official PawnIO setup from its publisher, verify its SHA-256 and install it silently;
+if that fails, it offers the PawnIO website instead. The packages are not code-signed,
 so Windows SmartScreen shows "Windows protected your PC" the first time (More info → Run anyway).
 
 The app icon is generated in code (`cargo run --example make_icon` rewrites `assets/app.ico`).
