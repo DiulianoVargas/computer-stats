@@ -133,3 +133,16 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
   channels are never shown. Read once at detection.
 - **Validation**: unit tests on the conversion and the mode bits; on hardware by the Gigabyte
   B550M's user (quickstart G1–G2). Not checked on the developer's PC (Nuvoton).
+
+## R10. Diagnosing an unsupported board
+
+- **Context (2026-10-20)**: on the Gigabyte B550M AORUS ELITE, 0.5.0 showed
+  `— unsupported motherboard` although iCUE reads its fans. LibreHardwareMonitor lists the board
+  under its ITE configurations (CPU Fan, System Fan #1, System Fan #2), but the chip model and
+  why detection missed it cannot be told without reading the chip there.
+- **Decision**: when detection finds no supported chip, the app appends one line to
+  `%LOCALAPPDATA%\Computer Stats\crash.log`: for each configuration port, the chip ID read
+  before any enter sequence (a chip another tool left in configuration mode), after the Nuvoton
+  enter and after the ITE enter, plus the base address when a known chip had an invalid one. The
+  user sends that line; the chip is then added from real readings.
+

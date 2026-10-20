@@ -50,7 +50,8 @@ cargo run --example fan_spike -- target\package\modules-extract\LpcIO.bin
 | F3 | Pass | Widget grew 206 → 214 px: one Fan row in the GPU group, none in the CPU group; checked on screen by the user |
 | F4 | Pass in part (after FR-006 revision) | Developer's PC, lock cleared by the app: two Fans shown, about 700 and 3200 RPM. Not yet compared with HWiNFO; header names not yet mapped |
 | F5–F6 | Pending | |
-| G1–G2 | Pending | Needs the Gigabyte B550M user |
+| G1 (0.5.0) | Fail | Gigabyte B550M AORUS ELITE: Fans `— unsupported motherboard`; GPU Fan `— not reported` with the RTX 5060 Ti fan stopped at idle (expected, research R1). 0.5.1 logs the detection (research R10) |
+| G1–G2 | Pending | Rerun with 0.5.1 and the `crash.log` line |
 | F4 (regression after ITE support) | Pass | Developer's PC: the same two fans still shown after the detection gained the ITE path |
 | F7–F9 | Pending | Each reason is covered by unit tests (`metric::Reason`, `domain::fan`); manual runs pending |
 | F10 | See [measurements.md](measurements.md) | |
