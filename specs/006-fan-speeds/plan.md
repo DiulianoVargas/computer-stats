@@ -86,7 +86,7 @@ specs/006-fan-speeds/
 src/
 ├── domain/
 │   ├── fan.rs            # NEW: chip table, count → RPM, FanList, labels, GPU Fan rule
-│   ├── metric.rs         # MetricKind::GpuFan; Reason::{NotReported, UnsupportedMotherboard, LockedByFirmware}
+│   ├── metric.rs         # MetricKind::GpuFan; Reason::{UnsupportedMotherboard, LockedByFirmware}
 │   ├── format.rs         # rpm()
 │   └── sparkline.rs      # scale(GpuFan) and the fan scale 0–3000
 ├── platform/

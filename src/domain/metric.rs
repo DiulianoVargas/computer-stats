@@ -64,11 +64,9 @@ pub enum Reason {
     ModuleNotFound,
     NoGpu,
     ReadFailed,
-    /// The GPU driver has not reported a Fan Speed (006 research R1).
-    NotReported,
     /// The motherboard's monitoring chip is not one the app knows (006 research R3).
     UnsupportedMotherboard,
-    /// The firmware locked the monitoring chip against reads; the app never unlocks it (006 R4).
+    /// The firmware locked the monitoring chip against reads and clearing the lock failed (006 R4).
     LockedByFirmware,
 }
 
@@ -81,7 +79,6 @@ impl Reason {
             Reason::ModuleNotFound => "module not found",
             Reason::NoGpu => "no GPU",
             Reason::ReadFailed => "read failed",
-            Reason::NotReported => "not reported",
             Reason::UnsupportedMotherboard => "unsupported motherboard",
             Reason::LockedByFirmware => "locked by firmware",
         }

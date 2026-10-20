@@ -36,15 +36,15 @@
 
 ### GPU Fan rule (research R1)
 
-`GpuFanState { reported: bool }`: `FanRPM > 0` sets `reported`; while `!reported` the reading is
-`Unavailable(NotReported)`; after, `Reading::of(MetricKind::GpuFan, rpm)`.
+`gpu_fan(rpm) -> Reading`: `Reading::of(MetricKind::GpuFan, rpm)`, so 0 is `0 RPM` (revised; the
+earlier "not reported" state is removed).
 
 ### Changes to existing types (`src/domain/metric.rs`)
 
 - `MetricKind::GpuFan` — added after `GpuTemperature` in `ALL` (Panel order); `MetricKind::ALL`
   becomes 7. Validation: 0–10 000, else `ReadFailed`. Always Normal (no thresholds; spec FR-007).
-- `Reason::{NotReported, UnsupportedMotherboard, LockedByFirmware}` with messages
-  "not reported", "unsupported motherboard", "locked by firmware".
+- `Reason::{UnsupportedMotherboard, LockedByFirmware}` with messages "unsupported motherboard",
+  "locked by firmware".
 
 ## Snapshot (`src/snapshot.rs`)
 

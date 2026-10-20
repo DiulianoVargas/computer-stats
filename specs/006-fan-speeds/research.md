@@ -10,7 +10,10 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
   for GPU Temperature (ADR-0003). One more field read; no new call.
 - **Spike S2 result**: the GTX 1660 SUPER reports `FanRPM = 830` at idle (HWiNFO agrees); the
   integrated Radeon reports 0.
-- **Stopped vs not reported**: the driver uses 0 for both. GPU Fan shows `— not reported` until
+- **Revised 2026-10-20**: GPU Fan shows `0 RPM` for 0 from the first second, like iCUE; the
+  "not reported" state is removed (spec FR-004). A dedicated GPU whose driver never fills
+  `FanRPM`, or a fanless card, then reads `0 RPM`; accepted. The original rule follows.
+- **Stopped vs not reported (original)**: the driver uses 0 for both. GPU Fan shows `— not reported` until
   `FanRPM` has been above 0 once in this run, then `0 RPM` for 0 (spec US2.3). A zero-RPM GPU idle
   since boot therefore shows `— not reported` until it first spins; accepted.
 - **Plausibility**: above 10 000 RPM → `read failed` for that second (gap).
@@ -61,6 +64,12 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
 
 ## R4. The firmware lock (decision by the user)
 
+- **Revised 2026-10-20 (after 0.4.0)**: the user asked for the app to read the fans "like iCUE",
+  clearing the lock. Detection now clears bit 4 of register `0x28` of the hardware monitor device
+  when it is set (read-modify-write, no other bit touched), then reads it back; still set →
+  `— locked by firmware`. If every fan byte reads `0xFF` later (lock set again, e.g. after sleep),
+  the next tick re-runs detection, which clears it again. The original decision follows.
+
 - **Context**: Nuvoton NCT679x/6701D have an "I/O space lock" bit; ASUS firmware sets it. HWiNFO
   and LibreHardwareMonitor clear it before reading. It gates only I/O-port access to the
   sensors, has no effect on fan control and resets on reboot.
@@ -106,3 +115,41 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
   one mutex hold: well under 1 ms. While locked or unsupported: nothing per tick, one detection
   every 60 s (locked) or never (unsupported).
 - Memory: one `History` (60 × `Option<f32>`) per shown fan, at most 8 (7 + GPU).
+
+## R9. ITE chips (Gigabyte boards)
+
+- **Context (2026-10-20)**: a user's PC with a Gigabyte B550M AORUS ELITE showed every fan in
+  iCUE but would get `— unsupported motherboard` here: Gigabyte boards use ITE chips.
+- **Decision**: support the ITE IT8628E, IT8686E and IT8688E, which share one register layout and
+  need no bank select (LibreHardwareMonitor `IT87XX.cs`, reimplemented from the register map).
+  The second ITE chip some Gigabyte boards have (IT879x on port 0x4E, behind a Gigabyte embedded
+  controller) is left out.
+- **IT8689E (added 2026-10-20)**: the Gigabyte B550M AORUS ELITE's chip (its `crash.log` line read
+  `ITE 0x8689`). Same fan registers, but register `0x06` bits 5–7 select a register bank; the fan
+  counts and `0x0C` are in bank 0. Before reading, bank 0 is selected if another tool left another
+  one, and that bank is restored after.
+- **Detection**: after the Nuvoton attempt on port 0x2E fails, enter ITE configuration mode with
+  `87 01 55 55`, read the 16-bit chip ID (`0x20` high, `0x21` low), `find_bars`, select logical
+  device `0x04` (environment controller), read the base `0x60` twice; exit by writing `0x02` to
+  configuration register `0x02`. ITE chips have no read lock.
+- **Fan read**: no banks; index `base+5`, data `base+6`. Channel registers (low / high):
+  `0x0D/0x18`, `0x0E/0x19`, `0x0F/0x1A`, `0x80/0x81`, `0x82/0x83`, `0x4C/0x4D`.
+  `count = high << 8 | low`: `0xFFFF` → stopped; `≤ 0x3F` → misread; else
+  `RPM = 1 350 000 / (2 × count)`.
+- **Channels 4–6** count only when enabled in register `0x0C` (bit 4, bit 5, bit 2); disabled
+  channels are never shown. Read once at detection.
+- **Validation**: unit tests on the conversion and the mode bits; on hardware by the Gigabyte
+  B550M's user (quickstart G1–G2). Not checked on the developer's PC (Nuvoton).
+
+## R10. Diagnosing an unsupported board
+
+- **Context (2026-10-20)**: on the Gigabyte B550M AORUS ELITE, 0.5.0 showed
+  `— unsupported motherboard` although iCUE reads its fans. LibreHardwareMonitor lists the board
+  under its ITE configurations (CPU Fan, System Fan #1, System Fan #2), but the chip model and
+  why detection missed it cannot be told without reading the chip there.
+- **Decision**: when detection finds no supported chip, the app appends one line to
+  `%LOCALAPPDATA%\Computer Stats\crash.log`: for each configuration port, the chip ID read
+  before any enter sequence (a chip another tool left in configuration mode), after the Nuvoton
+  enter and after the ITE enter, plus the base address when a known chip had an invalid one. The
+  user sends that line; the chip is then added from real readings.
+

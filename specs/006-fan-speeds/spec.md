@@ -55,8 +55,9 @@ reading for the same fan over 1 minute, and the value rises when the CPU is put 
    Panel, **Then** the Fans section shows the same reason as CPU Temperature (`— driver not
    found`, `— not elevated`).
 6. **Given** the motherboard's firmware has locked the monitoring chip against reads (as on the
-   developer's ASUS board), **When** the user opens the Panel, **Then** the Fans section shows
-   `— locked by firmware`, and the fans appear without a restart if another tool unlocks it.
+   developer's ASUS board), **When** the app starts, **Then** it clears that read lock, as HWiNFO,
+   iCUE and LibreHardwareMonitor do, and the fans are shown. Only if the lock cannot be cleared
+   does the Fans section show `— locked by firmware`.
 
 ---
 
@@ -76,11 +77,10 @@ value within 5 % of the GPU vendor's tool or HWiNFO over 1 minute, rising under 
 1. **Given** a GPU whose driver reports fan speed, **When** the user opens the Panel, **Then** the
    GPU section has a Fan row with RPM and a Sparkline.
 2. **Given** a GPU whose fans stop at idle (zero-RPM mode), **When** the GPU is idle, **Then** the
-   row shows `0 RPM`.
+   row shows `0 RPM`, from the first second (as iCUE does).
 3. **Given** a GPU driver that does not report fan speed, **When** the user opens the Panel,
-   **Then** the GPU Fan row shows `— not reported`. The driver reports a stopped fan and a
-   missing reading alike, so GPU Fan shows `— not reported` until the driver has reported a speed
-   above 0 once; after that, 0 shows as `0 RPM`.
+   **Then** the GPU Fan row shows `0 RPM`: the driver reports a stopped fan and a missing reading
+   alike, and a stopped fan is the common case (revised 2026-10-20, see Clarifications).
 4. **Given** no dedicated GPU, **When** the user opens the Panel, **Then** the GPU Fan row shows
    `— no GPU`, as the other GPU Metrics do.
 
@@ -138,18 +138,20 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
   S1), so the list starts empty.
 - **FR-003**: A fan header MUST be shown only once it has reported a speed above 0 since the app
   started, and MUST then stay listed (showing `0 RPM` when stopped) until the app restarts.
-- **FR-004**: The GPU section MUST show a GPU Fan row with RPM and a Sparkline when the GPU driver
-  reports fan speed, and `— not reported` when it does not.
+- **FR-004**: The GPU section MUST show a GPU Fan row with RPM and a Sparkline. A speed of 0 (fans
+  stopped, or not reported by the driver) MUST show as `0 RPM`.
 - **FR-005**: When fan speeds cannot be read, the Fans section MUST show one row with the reason,
   using the same wording as CPU Temperature where the cause is shared (`— not elevated`,
   `— driver not found`, `— module not found`, `— read failed`), plus `— unsupported
   motherboard` when the board's monitoring chip is not recognised and `— locked by firmware` when
   the firmware has locked the chip against reads.
 - **FR-006**: The app MUST only read fan speeds. It MUST NOT change fan speeds, fan curves or any
-  setting of the monitoring chip, including the firmware's read lock: a locked chip gives
-  `— locked by firmware`. The only writes allowed are the chip's access protocol (entering and
-  leaving configuration mode, and selecting the device, bank and register to read), which every
-  monitoring tool performs and which change no setting.
+  setting of the monitoring chip, with one exception: the firmware's I/O space read lock, which
+  it clears when set (revised 2026-10-20, see Clarifications). The lock gates only reads of the
+  sensors, affects no fan behaviour and is set again by the firmware on the next boot. The other
+  writes allowed are the chip's access protocol (entering and leaving configuration mode, and
+  selecting the device, bank and register to read). If the lock is still set after clearing it,
+  the Fans section shows `— locked by firmware`.
 - **FR-007**: Fans MUST always have the Normal Warning Level and MUST NOT affect the Status Dot.
 - **FR-008**: A failure to read fans MUST NOT affect any other Metric, and a failure of the GPU
   Fan MUST NOT affect the motherboard fans or the other GPU Metrics.
@@ -182,8 +184,7 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
 
 - **SC-001**: On a PC with an unlocked supported chip, every fan HWiNFO lists under the
   motherboard appears in the Panel, and each reading agrees with HWiNFO within 5 % over 1 minute
-  idle and 1 minute under load. On the developer's PC the Fans section shows
-  `— locked by firmware`.
+  idle and 1 minute under load, the developer's PC included.
 - **SC-002**: When a GPU driver reports fan speed, GPU Fan agrees with HWiNFO within 5 % over the
   same minutes.
 - **SC-003**: A fan that stops while the app runs shows `0 RPM` within 2 seconds.
@@ -198,11 +199,11 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
   NVIDIA GeForce GTX 1660 SUPER; Windows reports no fans through its own management interface.
 - PawnIO.Modules 0.2.11 includes `LpcIO.bin`, which gives access to the motherboard's monitoring
   chip (Super I/O). The chips supported are the Nuvoton NCT6796D–NCT6799D and NCT6701D family
-  found on current ASUS, MSI and Gigabyte desktop boards; others give `— unsupported motherboard`
-  until added.
+  (ASUS, MSI) and the ITE IT8628E, IT8686E, IT8688E and IT8689E (Gigabyte; research R9); others give
+  `— unsupported motherboard` until added.
 - Spike S1 (2026-10-20): the developer's board has a Nuvoton NCT6701D whose firmware sets the
-  read lock, so its fans show `— locked by firmware`. Motherboard fan reading is validated on a
-  PC whose chip is not locked.
+  read lock. Since the revision of FR-006 the app clears it, so the fans are validated on the
+  developer's PC.
 - Spike S2 (2026-10-20): the Windows graphics statistics report the developer's GTX 1660 SUPER fan
   (830 RPM at idle); the integrated Radeon reports 0.
 - The system-wide lock used by monitoring tools for the chip is the shared "ISA bus" mutex used by
@@ -222,3 +223,12 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
 - Q: The developer's chip is locked by the firmware; may the app clear the lock to read the fans,
   as HWiNFO and LibreHardwareMonitor do? → A: No. The app never changes a chip setting; a locked
   chip shows `— locked by firmware` (FR-005, FR-006).
+- Q (revisited 2026-10-20, after 0.4.0): should the app clear the firmware's read lock after all,
+  as iCUE does? → A: Yes. The user reversed the earlier answer: the app clears only the I/O space
+  lock bit, never any other chip setting (FR-006).
+- Q (2026-10-20): should Gigabyte boards be supported, as on a user's B550M AORUS ELITE where iCUE
+  shows every fan? → A: Yes: ITE IT8628E / IT8686E / IT8688E (research R9), validated by that
+  user.
+- Q (2026-10-20, after the Gigabyte test): a GPU whose fans stop at idle showed `— not reported`;
+  shouldn't a stopped fan just show as not spinning? → A: Yes. GPU Fan shows `0 RPM` whenever the
+  driver reports 0, like iCUE; the "not reported" state is removed (FR-004).

@@ -11,6 +11,8 @@ export struct AppRowData {
     memory-text: string,
     icon: image,
     has-icon: bool,
+    // The name's first letter, shown when there is no icon.
+    initial: string,
     // Waiting for the confirming click (End App).
     armed: bool,
     // Ended; waiting for the next sample to drop the row.
@@ -29,7 +31,7 @@ export component AppRow inherits Rectangle {
         spacing: 4px;
         padding-right: 4px;
 
-        // Icon, or a generic placeholder.
+        // Icon, or the name's first letter when the App has none.
         VerticalLayout {
             alignment: center;
             width: 16px;
@@ -40,11 +42,17 @@ export component AppRow inherits Rectangle {
                 image-rendering: smooth;
             }
             if !data.has-icon: Rectangle {
-                width: 14px;
-                height: 14px;
+                width: 16px;
+                height: 16px;
                 border-radius: 3px;
-                border-width: 1px;
-                border-color: Theme.muted-text;
+                background: Theme.bar-track;
+
+                Text {
+                    text: data.initial;
+                    color: Theme.muted-text;
+                    font-size: 10px;
+                    font-weight: 600;
+                }
             }
         }
 

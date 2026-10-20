@@ -14,7 +14,7 @@ use windows::Wdk::Graphics::Direct3D::{
 };
 use windows::Win32::Foundation::LUID;
 
-use crate::domain::fan::GpuFanState;
+use crate::domain::fan;
 use crate::domain::gpu::{self, AdapterCandidate, Segment};
 use crate::domain::metric::{MetricKind, Reading, Reason};
 
@@ -47,7 +47,6 @@ pub struct GpuSource {
     /// Each node's running time at `sampled_at`, for the next usage delta.
     running: Vec<i64>,
     sampled_at: Instant,
-    fan: GpuFanState,
 }
 
 impl GpuSource {
@@ -84,7 +83,6 @@ impl GpuSource {
             vram_total: candidates[index].dedicated_video_bytes,
             running: Vec::new(),
             sampled_at: Instant::now(),
-            fan: GpuFanState::default(),
         };
         source.running = source.running_times().unwrap_or_default();
         Ok(source)
@@ -111,7 +109,7 @@ impl GpuSource {
         let temperature = perf
             .and_then(|p| gpu::temperature_c(p.Temperature))
             .map_or(failed, |v| Reading::of(MetricKind::GpuTemperature, v));
-        let fan = perf.map_or(failed, |p| self.fan.next(p.FanRPM));
+        let fan = perf.map_or(failed, |p| fan::gpu_fan(p.FanRPM));
 
         let vram = match self.segments() {
             Some(segments) if self.vram_total > 0 => {
