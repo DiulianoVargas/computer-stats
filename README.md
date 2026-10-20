@@ -5,8 +5,9 @@
 <h1 align="center">Computer Stats</h1>
 
 <p align="center">
-  A tiny Windows tray app that shows how your PC is doing — CPU, GPU, memory, disks and
-  temperatures — one click away, and lets you end the program that is slowing it down.
+  A tiny Windows tray app that shows how your PC is doing — CPU, GPU, memory, disks,
+  temperatures and fan speeds — one click away, and lets you end the program that is slowing it
+  down.
 </p>
 
 <p align="center">
@@ -14,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/panel-metrics.png" width="320" alt="The Computer Stats Panel: CPU usage and temperature, GPU usage, temperature and VRAM, memory and disk space, each with a 60-second graph">
+  <img src="docs/images/panel-metrics.png" width="320" alt="The Computer Stats Panel: CPU usage and temperature, GPU usage, temperature, fan speed and VRAM, memory, motherboard fans and disk space, each with a 60-second graph">
 </p>
 
 ## Why
@@ -35,10 +36,10 @@ bloated or full of ads. Computer Stats lives in the system tray, uses about **4 
   notice it without opening anything. No pop-ups, no sounds.
 - **Processes tab** — every running program with its icon, CPU and memory use, sorted by CPU or
   memory. Click **End**, then **Confirm?**, to close a program that is stuck or hogging the PC.
-- **Desktop widget (optional)** — CPU, GPU (with its fan) and memory with their graphs, on a see-through card
-  on your wallpaper. Turn it on from the tray menu and drag it anywhere. It stays behind your
-  windows, shows up when you go to the desktop (Win+D), and comes back where you left it. Off by
-  default.
+- **Desktop widget (optional)** — CPU, GPU (with its fan) and memory with their graphs, on a
+  see-through card on your wallpaper. Turn it on from the tray menu and drag it anywhere. It stays
+  behind your windows, shows up when you go to the desktop (Win+D), and comes back where you left
+  it. Off by default.
 - **Start with Windows** — one click in the tray menu; starts at sign-in without a UAC prompt.
 - **Light and dark theme**, any taskbar position, multiple monitors and high-DPI screens.
 - **Native and lightweight** — written in Rust with a natively rendered UI: no browser engine, no
@@ -51,12 +52,14 @@ bloated or full of ads. Computer Stats lives in the system tray, uses about **4 
 2. Run it. Windows may show **"Windows protected your PC"** because the installer is not
    code-signed: click **More info → Run anyway**.
 3. Keep **"Install PawnIO"** ticked if it is offered — it is the driver that lets the app read the
-   CPU temperature (downloaded from its official publisher and verified).
+   CPU temperature and the motherboard's fans (downloaded from its official publisher and
+   verified).
 4. Computer Stats starts and its icon appears in the tray (it may hide under the **^** arrow; drag
    it to the taskbar to keep it visible).
 
 Prefer not to install? Download **`ComputerStats-<version>-portable.zip`**, unzip it anywhere and
-run `computer-stats.exe` (install PawnIO from [pawnio.eu](https://pawnio.eu) for CPU temperature).
+run `computer-stats.exe` (install PawnIO from [pawnio.eu](https://pawnio.eu) for CPU temperature
+and motherboard fans).
 
 **Requirements:** Windows 10 (1809) or Windows 11, 64-bit.
 
@@ -83,6 +86,8 @@ run `computer-stats.exe` (install PawnIO from [pawnio.eu](https://pawnio.eu) for
 | CPU temperature | 80 °C | 90 °C |
 | GPU temperature | 80 °C | 87 °C |
 
+Fan speeds never turn amber or red: a fan's speed alone does not say whether something is wrong.
+
 ## What your PC needs for each value
 
 | Value | Works with |
@@ -98,10 +103,11 @@ When something can't be read, the Panel shows `—` and the reason (`no GPU`, `d
 
 ### Why it asks for administrator rights
 
-Windows has no built-in way for programs to read the CPU's real temperature, so Computer Stats uses
-the signed **PawnIO** driver, which only works for programs running as administrator. That is the
-only reason the app asks for elevation. Turning on **Start with Windows** registers a scheduled
-task, so the app starts elevated at sign-in without a UAC prompt.
+Windows has no built-in way for programs to read the CPU's real temperature or the motherboard's
+fan speeds, so Computer Stats uses the signed **PawnIO** driver, which only works for programs
+running as administrator. That is the only reason the app asks for elevation. Turning on **Start
+with Windows** registers a scheduled task, so the app starts elevated at sign-in without a UAC
+prompt.
 
 ## Resource use
 
@@ -112,6 +118,7 @@ Measured on a Ryzen 9 7900 with Windows 11 and about 300 running processes:
 | Panel closed | ~4–5 MB | 0.04 % |
 | Panel open (Metrics) | ~4 MB | 0.03 % |
 | Panel open (Processes) | ~7 MB | 0.13 % |
+| Desktop widget on, Panel closed | ~11 MB | 0.06 % |
 | Download size | 5.9 MB installer · 9 MB executable | |
 
 ## Safety and privacy
@@ -122,6 +129,9 @@ Measured on a Ryzen 9 7900 with Windows 11 and about 300 running processes:
   can make Windows unstable or restart it. That is why every End needs a second click.
 - Before ending a process, the app checks it is still the same process it listed, so a recycled
   process ID can never make it close the wrong program.
+- **Fans are read-only.** The app never changes fan speeds, fan curves or any setting of the
+  motherboard's monitoring chip — not even the firmware's read lock. It shares the chip with tools
+  like HWiNFO through the same system-wide lock they use, so they do not disturb each other.
 
 ## Troubleshooting
 
@@ -169,8 +179,8 @@ cargo build --release
 
 The executable asks for elevation (`highestAvailable`), so run `cargo run` or the built exe from an
 **elevated** terminal — or set `$env:__COMPAT_LAYER = 'RunAsInvoker'` to run it without elevation
-(CPU temperature then shows `— not elevated`). For CPU temperature and motherboard fans during
-development, copy `AMDFamily17.bin` or `IntelMSR.bin`, and `LpcIO.bin`, from
+(CPU temperature and motherboard fans then show `— not elevated`). For CPU temperature and
+motherboard fans during development, copy `AMDFamily17.bin` or `IntelMSR.bin`, and `LpcIO.bin`, from
 [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules/releases) next to the exe. To diagnose a
 board's monitoring chip, run `cargo run --example fan_spike -- path\to\LpcIO.bin` elevated
 (read-only).
@@ -219,7 +229,7 @@ has a specification, a plan, research notes and a task list before any code.
 | [`docs/adr/`](docs/adr/) | Architecture decisions (Rust + Slint, running elevated, GPU via Windows instead of NVML) |
 | [`specs/`](specs/) | One folder per feature: spec, plan, research, data model, UI contract, tasks, measurements |
 | `src/domain/` | Pure logic (warning levels, graphs, formatting, decoding) — unit-tested, no I/O |
-| `src/platform/` | The only place with `unsafe`: Win32, D3DKMT, PawnIO, process enumeration |
+| `src/platform/` | The only place with `unsafe`: Win32, D3DKMT, PawnIO, Super I/O (fans), process enumeration |
 | `ui/` | The Slint UI |
 
 | Feature | Spec |
