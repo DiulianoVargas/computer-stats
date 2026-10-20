@@ -54,8 +54,8 @@ new crates
 | VIII. Graceful Degradation | ✅ | Unreadable path/name/icon/memory falls back per Process; End reports `access denied` per row; enumeration failure shows an empty list with a reason |
 | IX. Code Hygiene | ✅ | New terms (Process, Processes View, Metrics View, End App) added to `CONTEXT.md` before code |
 
-**Post-design re-check**: passing, with the constitution amended to 1.2.0 as part of this
-feature's first task.
+**Post-design re-check**: passing; the constitution was amended to 1.2.0 together with this
+plan (Principle IV, End App rule).
 
 ## Project Structure
 
@@ -99,7 +99,7 @@ unchanged so the Panel becomes a tab bar plus two Views.
 
 ## Implementation Order and Risks
 
-1. **Constitution amendment and enumeration first**: measure one `NtQuerySystemInformation` tick
+1. **Enumeration first**: measure one `NtQuerySystemInformation` tick
    (time and memory) with 300+ Processes before building UI.
 2. **Icon extraction cost** (R5) is the main SC-001 risk; the per-tick time budget mitigates it.
 3. **ListView in-place updates** must keep scroll position (P14); verified early with a fake model.
