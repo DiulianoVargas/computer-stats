@@ -12,5 +12,6 @@ pub mod pawnio;
 pub mod processes;
 pub mod settings;
 pub mod shell;
+pub mod superio;
 pub mod theme;
 pub mod tray;

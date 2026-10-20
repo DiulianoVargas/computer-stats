@@ -1,4 +1,4 @@
-//! GPU Usage, GPU Temperature and VRAM from the Windows kernel graphics statistics (D3DKMT in
+//! GPU Usage, GPU Temperature, GPU Fan and VRAM from the Windows kernel graphics statistics (D3DKMT in
 //! `gdi32.dll`, the source Task Manager uses; ADR-0003). No vendor library is loaded.
 
 use std::ffi::c_void;
@@ -14,13 +14,15 @@ use windows::Wdk::Graphics::Direct3D::{
 };
 use windows::Win32::Foundation::LUID;
 
+use crate::domain::fan::GpuFanState;
 use crate::domain::gpu::{self, AdapterCandidate, Segment};
 use crate::domain::metric::{MetricKind, Reading, Reason};
 
-/// The three GPU Metrics of one tick.
+/// The four GPU Metrics of one tick.
 pub struct GpuReadings {
     pub usage: Reading,
     pub temperature: Reading,
+    pub fan: Reading,
     pub vram: Reading,
 }
 
@@ -29,6 +31,7 @@ impl GpuReadings {
         GpuReadings {
             usage: Reading::Unavailable(reason),
             temperature: Reading::Unavailable(reason),
+            fan: Reading::Unavailable(reason),
             vram: Reading::Unavailable(reason),
         }
     }
@@ -44,6 +47,7 @@ pub struct GpuSource {
     /// Each node's running time at `sampled_at`, for the next usage delta.
     running: Vec<i64>,
     sampled_at: Instant,
+    fan: GpuFanState,
 }
 
 impl GpuSource {
@@ -80,6 +84,7 @@ impl GpuSource {
             vram_total: candidates[index].dedicated_video_bytes,
             running: Vec::new(),
             sampled_at: Instant::now(),
+            fan: GpuFanState::default(),
         };
         source.running = source.running_times().unwrap_or_default();
         Ok(source)
@@ -101,10 +106,12 @@ impl GpuSource {
             None => failed,
         };
 
-        let temperature = self
-            .perf_data()
+        // One perf data query serves GPU Temperature and GPU Fan (006 research R1).
+        let perf = self.perf_data();
+        let temperature = perf
             .and_then(|p| gpu::temperature_c(p.Temperature))
             .map_or(failed, |v| Reading::of(MetricKind::GpuTemperature, v));
+        let fan = perf.map_or(failed, |p| self.fan.next(p.FanRPM));
 
         let vram = match self.segments() {
             Some(segments) if self.vram_total > 0 => {
@@ -118,6 +125,7 @@ impl GpuSource {
         GpuReadings {
             usage,
             temperature,
+            fan,
             vram,
         }
     }

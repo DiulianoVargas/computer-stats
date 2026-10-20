@@ -1,9 +1,9 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.2.0
-- Modified principles: IV. Elevated Minimal Surface (adds the rule bounding End App)
-- Rationale: feature 003 lets the always-elevated app end other programs' Processes; like App
-  Volume, this must only follow direct, confirmed user input
+- Version change: 1.2.0 → 1.2.1
+- Modified sections: Technical Constraints → Data sources (adds the Fan Speed sources)
+- Rationale: feature 006 reads motherboard Fan Speeds through PawnIO's LpcIO module and the GPU Fan
+  from the D3DKMT perf data already used; a clarification of existing sources, no new capability
 - Templates requiring updates: none (templates read the constitution at runtime)
 - Follow-up TODOs: none
 -->
@@ -105,7 +105,8 @@ Rationale: one vocabulary across conversation, specs, and code prevents drift an
 - Platform: Windows 11, always elevated (ADR-0002).
 - Data sources: Windows Core Audio COM via the `windows` crate (App Volume, Audio Level); Windows
   kernel graphics statistics, D3DKMT in `gdi32.dll` (GPU Usage, VRAM, GPU Temperature; ADR-0003);
-  PawnIO driver (CPU Temperature); Windows system APIs (CPU Usage, Memory Usage, Disk Space).
+  PawnIO driver (CPU Temperature; motherboard Fan Speeds through its `LpcIO` module); D3DKMT perf
+  data (GPU Fan); Windows system APIs (CPU Usage, Memory Usage, Disk Space).
 - Release profile: `lto = true`, `codegen-units = 1`, `panic = "abort"`, `strip = true`.
 
 ## Quality Gates
@@ -129,4 +130,4 @@ Every release MUST additionally pass the resource-budget measurement script (Pri
 - Plans MUST include a constitution check; any deviation MUST be justified in the plan's
   complexity tracking.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-20
+**Version**: 1.2.1 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-20

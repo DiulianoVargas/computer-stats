@@ -29,7 +29,7 @@ Drives
   `— no GPU`, like the other GPU rows.
 - **Fans section**:
   - One row per shown fan, in channel order (data-model `FanList`).
-  - Unavailable → one row: label `Fans`, value `— {reason}` in the muted colour, no Sparkline.
+  - Unavailable → one full-width line `— {reason}` in the muted colour under the header.
   - Readable but no fan has spun yet → the section is not shown.
 - **Reasons**: `— not elevated`, `— driver not found`, `— module not found`, `— read failed`,
   `— unsupported motherboard`, `— locked by firmware`; GPU Fan also `— not reported`.

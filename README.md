@@ -27,13 +27,15 @@ bloated or full of ads. Computer Stats lives in the system tray, uses about **4 
 
 - **Everything at a glance** — CPU usage and temperature, GPU usage and temperature, VRAM, memory
   and free space on every internal drive, updated every second.
+- **Fan speeds** — the GPU fan, and the motherboard's fans on supported boards, in RPM with their
+  graphs. Read-only: the app never changes fan speeds or settings.
 - **60-second graphs** next to each value, so you can tell a spike from a sustained load.
 - **Warnings by color** — values turn amber or red when memory is almost full, a disk is running
   out of space or a temperature is too high, and a colored dot appears on the tray icon so you
   notice it without opening anything. No pop-ups, no sounds.
 - **Processes tab** — every running program with its icon, CPU and memory use, sorted by CPU or
   memory. Click **End**, then **Confirm?**, to close a program that is stuck or hogging the PC.
-- **Desktop widget (optional)** — CPU, GPU and memory with their graphs, on a see-through card
+- **Desktop widget (optional)** — CPU, GPU (with its fan) and memory with their graphs, on a see-through card
   on your wallpaper. Turn it on from the tray menu and drag it anywhere. It stays behind your
   windows, shows up when you go to the desktop (Win+D), and comes back where you left it. Off by
   default.
@@ -88,6 +90,8 @@ run `computer-stats.exe` (install PawnIO from [pawnio.eu](https://pawnio.eu) for
 | CPU usage, memory, disks | Any PC |
 | GPU usage, temperature, VRAM | Any dedicated GPU (NVIDIA, AMD, Intel Arc) — read from Windows itself, like Task Manager. Integrated graphics are ignored. |
 | CPU temperature | **AMD Ryzen** and **Intel** CPUs, with the [PawnIO](https://pawnio.eu) driver installed and the app running as administrator |
+| GPU fan | A dedicated GPU whose driver reports its fan speed (e.g. NVIDIA) |
+| Motherboard fans | Desktop boards with a **Nuvoton NCT6796D–NCT6799D or NCT6701D** monitoring chip (most current ASUS, MSI and Gigabyte boards), PawnIO installed and the app running as administrator. Laptops are not supported. |
 
 When something can't be read, the Panel shows `—` and the reason (`no GPU`, `driver not found`,
 `unsupported CPU`, …) and everything else keeps working.
@@ -128,6 +132,14 @@ Measured on a Ryzen 9 7900 with Windows 11 and about 300 running processes:
 - **`— driver not found`** — install PawnIO from [pawnio.eu](https://pawnio.eu) (Official edition)
   and restart the app.
 - **`— unsupported CPU`** — CPU temperature is available for AMD Ryzen and Intel CPUs only.
+- **Fans show `— locked by firmware`** — your motherboard's firmware locks its monitoring chip
+  against reads (common on ASUS boards). Tools like HWiNFO unlock it; Computer Stats only reads and
+  never changes a chip setting, so it waits: the fans appear by themselves within a minute if
+  another tool unlocks the chip.
+- **Fans show `— unsupported motherboard`** — the board's monitoring chip is not one the app
+  knows yet (see the table above).
+- **GPU fan shows `— not reported`** — the GPU driver has not reported a fan speed yet. Some GPUs
+  stop their fans when idle and report 0; the value appears once the fan first spins.
 - **The app closed unexpectedly** — please open an
   [issue](https://github.com/DiulianoVargas/computer-stats/issues) and attach
   `%LOCALAPPDATA%\Computer Stats\crash.log`.
@@ -157,9 +169,11 @@ cargo build --release
 
 The executable asks for elevation (`highestAvailable`), so run `cargo run` or the built exe from an
 **elevated** terminal — or set `$env:__COMPAT_LAYER = 'RunAsInvoker'` to run it without elevation
-(CPU temperature then shows `— not elevated`). For CPU temperature during development, copy
-`AMDFamily17.bin` or `IntelMSR.bin` from [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules/releases)
-next to the exe.
+(CPU temperature then shows `— not elevated`). For CPU temperature and motherboard fans during
+development, copy `AMDFamily17.bin` or `IntelMSR.bin`, and `LpcIO.bin`, from
+[PawnIO.Modules](https://github.com/namazso/PawnIO.Modules/releases) next to the exe. To diagnose a
+board's monitoring chip, run `cargo run --example fan_spike -- path\to\LpcIO.bin` elevated
+(read-only).
 
 Debug builds also accept:
 
@@ -215,6 +229,7 @@ has a specification, a plan, research notes and a task list before any code.
 | 003 — Processes tab with End App | [`specs/003-processes-view`](specs/003-processes-view) |
 | 004 — Intel CPU temperature, PawnIO from the installer | [`specs/004-intel-cpu-temperature`](specs/004-intel-cpu-temperature) |
 | 005 — Optional Desktop Widget | [`specs/005-desktop-widget`](specs/005-desktop-widget) |
+| 006 — Fan speeds | [`specs/006-fan-speeds`](specs/006-fan-speeds) |
 
 ## License
 
@@ -225,8 +240,8 @@ licenses (below).
 
 - [Slint](https://slint.dev), used under the
   [Slint Royalty-free Desktop, Mobile, and Web Applications License 2.0](https://slint.dev/terms-and-conditions#royalty-free).
-- [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules) (`AMDFamily17.bin`, `IntelMSR.bin`),
-  LGPL-2.1, shipped unmodified.
+- [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules) (`AMDFamily17.bin`, `IntelMSR.bin`,
+  `LpcIO.bin`), LGPL-2.1, shipped unmodified.
 - [PawnIO](https://pawnio.eu) by namazso — not bundled; downloaded from its publisher on request.
 - Rust crates under MIT/Apache-2.0 and similar licenses; the full list with license texts ships as
   `licenses\rust-crates.txt`.

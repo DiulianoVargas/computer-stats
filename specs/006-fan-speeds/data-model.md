@@ -27,8 +27,10 @@
 ### `FanList` — which channels are shown (spec FR-003)
 
 - Holds, per channel, `seen: bool` (reported above 0 since start) and a `History`.
-- `update(samples: &[FanSample])`: a channel becomes `seen` on its first `Rpm`; once seen it stays
-  listed. Unseen channels are not shown and keep no history.
+- `update(samples: &[FanSample], gaps)`: a channel becomes `seen` on its first `Rpm`; once seen it
+  stays listed. Unseen channels are not shown and keep no history. `update_failed(gaps)`: a tick
+  with no read (mutex busy, port error) is a gap for every shown Fan.
+- `shown() -> Vec<ShownFan>` in channel order.
 - Labels: `labels_for(board: &str) -> Option<&'static [&'static str]>` (research R6, empty table);
   otherwise "Fan {n}" with `n` = channel index + 1. Order = channel order.
 
@@ -51,9 +53,9 @@ Snapshot
   metrics: [MetricState; 7]        // + GpuFan
   fans: FansState                  // new
 FansState
-  Unavailable(Reason)              // one "— reason" row
-  Fans(Vec<FanState>)              // may be empty: no fan has spun yet → no rows
-FanState { label: String, reading: Reading, history: History, cpu_fan: bool }
+  Unavailable(Reason)              // one "— reason" line
+  Fans(Vec<ShownFan>)              // may be empty: no fan has spun yet → no section
+ShownFan { label: String, reading: Reading, history: History, cpu_fan: bool }   // domain::fan
 ```
 
 `cpu_fan` is true only for the channel a known board labels "CPU fan" (Desktop Widget, FR-011).
@@ -70,9 +72,11 @@ open() ──► NotElevated / DriverNotFound / ModuleNotFound      (permanent, 
 ```
 
 - `read() -> Result<Vec<FanSample>, Reason>`: holds the ISA mutex (10 ms wait; busy → every
-  channel `Invalid` this tick), reads each channel's two bytes, releases.
-- A read where every channel returns `0xFF/0xFF` after having been Ready → re-detect (lock set
-  again, e.g. after sleep).
+  channel `Invalid` this tick), selects the bank once, reads each channel's two bytes, releases.
+- A read where every byte is `0xFF` → re-check only the lock bit (no full detection); locked →
+  `Retry` in 60 s with `LockedByFirmware` (lock set again, e.g. after sleep).
+- States in code: `Ready { port, base, chip }` and `Retry { at, reason }` (locked, or the mutex
+  was busy during detection, retried after 1 s).
 
 ### PawnIO refactor (`src/platform/pawnio.rs`)
 

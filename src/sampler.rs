@@ -6,6 +6,7 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime};
 
+use crate::domain::fan::FanList;
 use crate::domain::history::History;
 use crate::domain::metric::{MetricKind, Reading, Reason};
 use crate::domain::status_dot;
@@ -13,10 +14,12 @@ use crate::domain::warning::{self, Thresholds, WarningLevel};
 use crate::platform::cpu::CpuTimes;
 use crate::platform::gpu::{GpuReadings, GpuSource};
 use crate::platform::pawnio::CpuTemperatureSource;
+use crate::platform::superio::{self, FanSource};
 use crate::platform::{drives, memory};
 use crate::process_sampler::ProcessSampler;
-use crate::snapshot::{APP_NAME, DriveState, MetricState, Snapshot};
+use crate::snapshot::{APP_NAME, DriveState, FansState, MetricState, Snapshot};
 
+const METRICS: usize = MetricKind::ALL.len();
 const TICK: Duration = Duration::from_secs(1);
 const JOIN_LIMIT: Duration = Duration::from_secs(2);
 /// How often the Drive list is re-enumerated (FR-022: within 5 s of a change).
@@ -29,12 +32,15 @@ struct Sampler {
     cpu: CpuTimes,
     cpu_temperature: Result<CpuTemperatureSource, Reason>,
     gpu: Result<GpuSource, Reason>,
+    /// Motherboard Fans (006).
+    fans: Result<FanSource, Reason>,
+    fan_list: FanList,
     drive_letters: Vec<char>,
     drives_enumerated: Option<Instant>,
     /// Previous Warning Levels, for hysteresis (FR-015).
-    levels: [Option<WarningLevel>; 6],
+    levels: [Option<WarningLevel>; METRICS],
     drive_levels: BTreeMap<char, WarningLevel>,
-    histories: [History; 6],
+    histories: [History; METRICS],
     /// Wall-clock time of the previous tick, to detect sleep (FR-021).
     previous_tick: Option<SystemTime>,
     /// Present only while the Processes View is visible (003 FR-018).
@@ -49,9 +55,11 @@ impl Sampler {
             cpu: CpuTimes::new(),
             cpu_temperature: CpuTemperatureSource::open(),
             gpu: GpuSource::open(),
+            fans: FanSource::open(),
+            fan_list: FanList::new(&superio::board_product()),
             drive_letters: Vec::new(),
             drives_enumerated: None,
-            levels: [None; 6],
+            levels: [None; METRICS],
             drive_levels: BTreeMap::new(),
             histories: Default::default(),
             previous_tick: None,
@@ -92,6 +100,7 @@ impl Sampler {
             cpu_temperature,
             gpu.usage,
             gpu.temperature,
+            gpu.fan,
             gpu.vram,
             memory::memory_usage(),
         ];
@@ -111,6 +120,7 @@ impl Sampler {
             level: self.levels[kind.index()],
             history: self.histories[kind.index()].clone(),
         });
+        let fans = self.read_fans(gaps);
         let drives = self.read_drives();
 
         let dot = status_dot::compute(
@@ -125,6 +135,7 @@ impl Sampler {
         );
         let snapshot = Snapshot {
             metrics,
+            fans,
             drives,
             tooltip: status_dot::tooltip(APP_NAME, &dot),
             status_dot: dot,
@@ -148,6 +159,26 @@ impl Sampler {
             .map_or(0, |elapsed| (elapsed.as_secs_f32() - 1.0).round() as usize);
         self.previous_tick = Some(now);
         missed.min(crate::domain::history::CAPACITY)
+    }
+
+    /// Motherboard Fans, after `gaps` missed seconds. A failure leaves the other Metrics alone.
+    fn read_fans(&mut self, gaps: usize) -> FansState {
+        let source = match &mut self.fans {
+            Ok(source) => source,
+            Err(reason) => return FansState::Unavailable(*reason),
+        };
+        match source.read() {
+            Ok(samples) => {
+                self.fan_list.update(&samples, gaps);
+                FansState::Fans(self.fan_list.shown())
+            }
+            // A Fan already shown keeps its row, with a gap, through a failed read.
+            Err(Reason::ReadFailed) if !self.fan_list.shown().is_empty() => {
+                self.fan_list.update_failed(gaps);
+                FansState::Fans(self.fan_list.shown())
+            }
+            Err(reason) => FansState::Unavailable(reason),
+        }
     }
 
     /// Free space of known Drives every tick; the list itself every `DRIVE_ENUMERATION`.

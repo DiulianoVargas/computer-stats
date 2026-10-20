@@ -1,4 +1,4 @@
-// The Desktop Widget (005 contracts/ui.md): five Metrics on a semi-transparent card. Never shown as a window: the app renders it with `take_snapshot()` and presents the
+// The Desktop Widget (005 contracts/ui.md): Metrics on a semi-transparent card; Fan rows (006). Never shown as a window: the app renders it with `take_snapshot()` and presents the
 // image on a layered window (research R1).
 import { MetricRowData } from "metric-row.slint";
 
@@ -79,6 +79,10 @@ export component WidgetWindow inherits Window {
     in property <MetricRowData> cpu-temperature;
     in property <MetricRowData> gpu-usage;
     in property <MetricRowData> gpu-temperature;
+    in property <MetricRowData> gpu-fan;
+    // The CPU Fan row exists only on a known board (006 FR-011).
+    in property <MetricRowData> cpu-fan;
+    in property <bool> has-cpu-fan;
     in property <MetricRowData> memory-usage;
     in property <bool> dark: true;
 
@@ -117,6 +121,7 @@ export component WidgetWindow inherits Window {
             SectionHeader { text: "CPU"; }
             WidgetMetricRow { data: root.cpu-usage; }
             WidgetMetricRow { data: root.cpu-temperature; }
+            if root.has-cpu-fan: WidgetMetricRow { data: root.cpu-fan; }
         }
 
         VerticalLayout {
@@ -124,6 +129,7 @@ export component WidgetWindow inherits Window {
             SectionHeader { text: "GPU"; }
             WidgetMetricRow { data: root.gpu-usage; }
             WidgetMetricRow { data: root.gpu-temperature; }
+            WidgetMetricRow { data: root.gpu-fan; }
         }
 
         VerticalLayout {

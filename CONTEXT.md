@@ -84,6 +84,22 @@ _Avoid_: Disk usage (ambiguous with activity)
 The current temperature of the processor and of the GPU respectively.
 _Avoid_: Temp, heat
 
+**Fan Speed**:
+How fast a Fan is spinning right now, in revolutions per minute (RPM). Always Normal: it has no Warning Level and never affects the Status Dot. The app only reads it and never changes it.
+_Avoid_: Fan RPM, fan level
+
+**Fan**:
+One fan header whose Fan Speed the app reads: a motherboard header (named after the board's printed label on a known board, "Fan 1", "Fan 2"… otherwise) or the GPU's own fan. A motherboard header is shown only once it has spun since the app started.
+_Avoid_: Cooler, blower, header (in user-facing text)
+
+**CPU Fan** / **GPU Fan**:
+The Fan on the motherboard's "CPU fan" header (only identifiable on a known board) and the GPU's own fan, reported by its driver.
+_Avoid_: Processor fan, graphics fan
+
+**Fans**:
+The Metrics View section listing every motherboard Fan, or one reason why they cannot be read (e.g. "locked by firmware").
+_Avoid_: Cooling, fan list
+
 **Sparkline**:
 A tiny line graph next to a Metric showing its last ~60 seconds. History is kept only while the app runs. Disk Space has no Sparkline.
 _Avoid_: Graph, chart, history

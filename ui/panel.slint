@@ -40,8 +40,11 @@ export component PanelWindow inherits Window {
     in property <MetricRowData> cpu-temperature;
     in property <MetricRowData> gpu-usage;
     in property <MetricRowData> gpu-temperature;
+    in property <MetricRowData> gpu-fan;
     in property <MetricRowData> vram;
     in property <MetricRowData> memory-usage;
+    in property <[MetricRowData]> fans;
+    in property <string> fans-reason;
     in property <[DriveRowData]> drives;
 
     // Processes View
@@ -150,8 +153,11 @@ export component PanelWindow inherits Window {
                         cpu-temperature: root.cpu-temperature;
                         gpu-usage: root.gpu-usage;
                         gpu-temperature: root.gpu-temperature;
+                        gpu-fan: root.gpu-fan;
                         vram: root.vram;
                         memory-usage: root.memory-usage;
+                        fans: root.fans;
+                        fans-reason: root.fans-reason;
                         drives: root.drives;
                     }
 

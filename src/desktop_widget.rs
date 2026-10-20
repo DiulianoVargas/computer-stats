@@ -10,8 +10,8 @@ use crate::domain::widget_place;
 use crate::generated::WidgetWindow;
 use crate::platform::desktop_window::{DesktopWindow, WidgetEvent};
 use crate::platform::{settings, shell};
-use crate::snapshot::Snapshot;
-use crate::ui::metric_row;
+use crate::snapshot::{FansState, Snapshot};
+use crate::ui::{fan_row, metric_row};
 
 /// Logical width, as in `ui/widget.slint`.
 const WIDGET_WIDTH: f32 = 320.0;
@@ -69,7 +69,8 @@ impl DesktopWidget {
         self.window.show();
     }
 
-    /// The same rows as the Panel for the five Metrics it shows (FR-002, SC-005), then repaints.
+    /// The same rows as the Panel for the Metrics it shows (FR-002, SC-005), then repaints. Fans:
+    /// the GPU Fan, and the CPU Fan only on a known board (006 FR-011).
     pub fn update(&mut self, snapshot: &Snapshot) {
         let m = &snapshot.metrics;
         let row = |kind: MetricKind| metric_row(&m[kind.index()]);
@@ -79,6 +80,15 @@ impl DesktopWidget {
         self.component.set_gpu_usage(row(MetricKind::GpuUsage));
         self.component
             .set_gpu_temperature(row(MetricKind::GpuTemperature));
+        self.component.set_gpu_fan(row(MetricKind::GpuFan));
+        let cpu_fan = match &snapshot.fans {
+            FansState::Fans(fans) => fans.iter().find(|f| f.cpu_fan),
+            FansState::Unavailable(_) => None,
+        };
+        self.component.set_has_cpu_fan(cpu_fan.is_some());
+        if let Some(fan) = cpu_fan {
+            self.component.set_cpu_fan(fan_row(fan));
+        }
         self.component
             .set_memory_usage(row(MetricKind::MemoryUsage));
         self.paint();

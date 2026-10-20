@@ -6,6 +6,7 @@ pub mod apps;
 pub mod cpu_temp;
 pub mod drive;
 pub mod end_confirm;
+pub mod fan;
 pub mod format;
 pub mod gpu;
 pub mod history;

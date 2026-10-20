@@ -12,6 +12,7 @@ use crate::crash_log;
 use crate::desktop_widget::DesktopWidget;
 use crate::domain::anchor::{self, Size};
 use crate::domain::app_order::Sort;
+use crate::domain::fan::ShownFan;
 use crate::domain::format;
 use crate::domain::metric::{MetricKind, Reading, Reason};
 use crate::domain::sparkline;
@@ -25,7 +26,7 @@ use crate::platform::tray::{self, MenuEntry, TrayEvent, TrayIcon};
 use crate::platform::{settings, shell};
 use crate::processes_ui::{self, EndResult, ProcessesUi};
 use crate::sampler::{self, SamplerHandle};
-use crate::snapshot::{DriveState, MetricState, Snapshot};
+use crate::snapshot::{DriveState, FansState, MetricState, Snapshot};
 use crate::startup;
 
 /// A click on the Tray Icon this soon after the Panel lost focus is the click that closed it
@@ -493,8 +494,15 @@ impl App {
         self.panel.set_gpu_usage(row(MetricKind::GpuUsage));
         self.panel
             .set_gpu_temperature(row(MetricKind::GpuTemperature));
+        self.panel.set_gpu_fan(row(MetricKind::GpuFan));
         self.panel.set_vram(row(MetricKind::Vram));
         self.panel.set_memory_usage(row(MetricKind::MemoryUsage));
+        let (fans, reason) = match &self.latest.fans {
+            FansState::Fans(fans) => (fans.iter().map(fan_row).collect(), String::new()),
+            FansState::Unavailable(reason) => (Vec::new(), format::unavailable(*reason)),
+        };
+        self.panel.set_fans(ModelRc::new(VecModel::from(fans)));
+        self.panel.set_fans_reason(reason.into());
         let drives: Vec<DriveRowData> = self.latest.drives.iter().map(drive_row).collect();
         self.panel.set_drives(ModelRc::new(VecModel::from(drives)));
     }
@@ -506,6 +514,7 @@ pub(crate) fn metric_row(state: &MetricState) -> MetricRowData {
         MetricKind::CpuUsage | MetricKind::GpuUsage | MetricKind::MemoryUsage => "Usage",
         MetricKind::CpuTemperature | MetricKind::GpuTemperature => "Temperature",
         MetricKind::Vram => "VRAM",
+        MetricKind::GpuFan => "Fan",
     };
     let (value, secondary, unavailable) = match state.reading {
         Reading::Unavailable(reason) => (format::unavailable(reason), String::new(), true),
@@ -521,6 +530,9 @@ pub(crate) fn metric_row(state: &MetricState) -> MetricRowData {
         Reading::Value { value, .. } if state.kind.is_temperature() => {
             (format::temperature(value), String::new(), false)
         }
+        Reading::Value { value, .. } if state.kind.is_fan() => {
+            (format::rpm(value), String::new(), false)
+        }
         Reading::Value { value, .. } => (format::percent(value), String::new(), false),
     };
     MetricRowData {
@@ -533,6 +545,23 @@ pub(crate) fn metric_row(state: &MetricState) -> MetricRowData {
             let (min, max) = sparkline::scale(state.kind);
             sparkline::path(&state.history, min, max).into()
         },
+    }
+}
+
+/// One motherboard Fan; always Normal (FR-007).
+pub(crate) fn fan_row(fan: &ShownFan) -> MetricRowData {
+    let (value, unavailable) = match fan.reading {
+        Reading::Value { value, .. } => (format::rpm(value), false),
+        Reading::Unavailable(reason) => (format::unavailable(reason), true),
+    };
+    let (min, max) = sparkline::FAN_SCALE;
+    MetricRowData {
+        label: fan.label.as_str().into(),
+        value_text: value.into(),
+        secondary_text: SharedString::new(),
+        unavailable,
+        level: 0,
+        sparkline: sparkline::path(&fan.history, min, max).into(),
     }
 }
 

@@ -43,3 +43,9 @@ cargo run --example fan_spike -- target\package\modules-extract\LpcIO.bin
 
 | # | Result | Notes |
 |---|--------|-------|
+| F1 | Pass (2026-10-20) | Release exe, elevated: GPU Fan `829 RPM` (spike S2: 830 RPM); Fans `— locked by firmware`. Not yet compared with HWiNFO side by side |
+| F2 | Pending | Needs a GPU load next to HWiNFO |
+| F3 | Pass | Widget grew 206 → 214 px: one Fan row in the GPU group, none in the CPU group; checked on screen by the user |
+| F4–F6 | Pending | Need a PC with an unlocked Nuvoton chip |
+| F7–F9 | Pending | Each reason is covered by unit tests (`metric::Reason`, `domain::fan`); manual runs pending |
+| F10 | See [measurements.md](measurements.md) | |
