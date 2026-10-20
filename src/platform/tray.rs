@@ -52,7 +52,6 @@ pub enum MenuEntry {
         /// `Some` makes the item checkable.
         checked: Option<bool>,
     },
-    #[allow(dead_code)] // used once Start with Windows joins the menu (T053)
     Separator,
 }
 
@@ -172,45 +171,6 @@ impl TrayIcon {
         (r.right > r.left).then(|| super::shell::from_win(r))
     }
 
-    /// Shows the Tray Menu at (`x`, `y`) and returns the chosen item's id. Blocks in the menu's
-    /// modal loop until it closes.
-    pub fn show_menu(&self, x: i32, y: i32, entries: &[MenuEntry]) -> Option<u32> {
-        let hwnd = STATE.with_borrow(|s| s.as_ref().map(|s| s.hwnd))?;
-        // SAFETY: the menu is created, used and destroyed here; strings outlive the calls.
-        unsafe {
-            let menu = CreatePopupMenu().ok()?;
-            for entry in entries {
-                match entry {
-                    MenuEntry::Item { id, text, checked } => {
-                        let text: Vec<u16> = text.encode_utf16().chain([0]).collect();
-                        let flags = if *checked == Some(true) {
-                            MF_STRING | MF_CHECKED
-                        } else {
-                            MF_STRING
-                        };
-                        let _ = AppendMenuW(menu, flags, *id as usize, PCWSTR(text.as_ptr()));
-                    }
-                    MenuEntry::Separator => {
-                        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
-                    }
-                }
-            }
-            // Without foreground, the menu would not close when clicking elsewhere.
-            let _ = SetForegroundWindow(hwnd);
-            let chosen = TrackPopupMenuEx(
-                menu,
-                (TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY).0,
-                x,
-                y,
-                hwnd,
-                None,
-            );
-            let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
-            let _ = DestroyMenu(menu);
-            (chosen.0 != 0).then_some(chosen.0 as u32)
-        }
-    }
-
     /// Replaces the icon image with premultiplied ARGB `pixels` (`size × size`, top row first).
     pub fn set_icon(&self, pixels: &[u32], size: u32) {
         let Some(icon) = make_icon(pixels, size) else {
@@ -254,6 +214,46 @@ impl Drop for TrayIcon {
             }
             let _ = DestroyWindow(state.hwnd);
         }
+    }
+}
+
+/// Shows the Tray Menu at (`x`, `y`) and returns the chosen item's id. Blocks in the menu's
+/// modal loop until it closes; other messages (and queued Slint callbacks) keep running meanwhile,
+/// so callers must not hold borrowed state across this call.
+pub fn show_menu(x: i32, y: i32, entries: &[MenuEntry]) -> Option<u32> {
+    let hwnd = STATE.with_borrow(|s| s.as_ref().map(|s| s.hwnd))?;
+    // SAFETY: the menu is created, used and destroyed here; strings outlive the calls.
+    unsafe {
+        let menu = CreatePopupMenu().ok()?;
+        for entry in entries {
+            match entry {
+                MenuEntry::Item { id, text, checked } => {
+                    let text: Vec<u16> = text.encode_utf16().chain([0]).collect();
+                    let flags = if *checked == Some(true) {
+                        MF_STRING | MF_CHECKED
+                    } else {
+                        MF_STRING
+                    };
+                    let _ = AppendMenuW(menu, flags, *id as usize, PCWSTR(text.as_ptr()));
+                }
+                MenuEntry::Separator => {
+                    let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+                }
+            }
+        }
+        // Without foreground, the menu would not close when clicking elsewhere.
+        let _ = SetForegroundWindow(hwnd);
+        let chosen = TrackPopupMenuEx(
+            menu,
+            (TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY).0,
+            x,
+            y,
+            hwnd,
+            None,
+        );
+        let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
+        let _ = DestroyMenu(menu);
+        (chosen.0 != 0).then_some(chosen.0 as u32)
     }
 }
 

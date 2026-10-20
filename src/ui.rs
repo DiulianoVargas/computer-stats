@@ -17,15 +17,17 @@ use crate::domain::warning::WarningLevel;
 use crate::generated::{DriveRowData, MetricRowData, PanelWindow};
 use crate::platform::shell;
 use crate::platform::theme;
-use crate::platform::tray::{MenuEntry, TrayEvent, TrayIcon};
+use crate::platform::tray::{self, MenuEntry, TrayEvent, TrayIcon};
 use crate::sampler;
 use crate::snapshot::{DriveState, MetricState, Snapshot};
+use crate::startup;
 
 /// A click on the Tray Icon this soon after the Panel lost focus is the click that closed it
 /// (the taskbar took focus first), so it must not reopen it (research R4).
 const TOGGLE_GUARD: Duration = Duration::from_millis(300);
 
-const MENU_QUIT: u32 = 1;
+const MENU_START_WITH_WINDOWS: u32 = 1;
+const MENU_QUIT: u32 = 2;
 
 /// Logical width, as in `ui/panel.slint`.
 const PANEL_WIDTH: f32 = 320.0;
@@ -42,6 +44,8 @@ struct App {
     hidden_by_deactivation: Option<Instant>,
     /// Logical height the Panel was last positioned for.
     placed_height: f32,
+    /// Start with Windows as last read from or written to Task Scheduler (FR-005).
+    start_with_windows: bool,
 }
 
 thread_local! {
@@ -99,6 +103,7 @@ pub fn run() -> Result<(), String> {
             visible: false,
             hidden_by_deactivation: None,
             placed_height: 0.0,
+            start_with_windows: startup::is_enabled(),
         })
     });
 
@@ -134,20 +139,41 @@ fn on_tray_event(event: TrayEvent) {
             with_app(|app| app.toggle());
         }
         TrayEvent::ContextMenu { x, y } => {
-            let chosen = with_app(|app| {
-                app.tray.show_menu(
-                    x,
-                    y,
-                    &[MenuEntry::Item {
+            let checked = with_app(|app| app.start_with_windows).unwrap_or(false);
+            // No App borrow across the menu's modal loop: snapshots keep arriving meanwhile.
+            let chosen = tray::show_menu(
+                x,
+                y,
+                &[
+                    MenuEntry::Item {
+                        id: MENU_START_WITH_WINDOWS,
+                        text: "Start with Windows",
+                        checked: Some(checked),
+                    },
+                    MenuEntry::Separator,
+                    MenuEntry::Item {
                         id: MENU_QUIT,
                         text: "Quit",
                         checked: None,
-                    }],
-                )
-            })
-            .flatten();
-            if chosen == Some(MENU_QUIT) {
-                let _ = slint::quit_event_loop();
+                    },
+                ],
+            );
+            match chosen {
+                Some(MENU_START_WITH_WINDOWS) => {
+                    let result = if checked {
+                        startup::disable()
+                    } else {
+                        startup::enable()
+                    };
+                    // On failure the checkmark keeps the old state; no dialog (contracts/ui.md).
+                    if result.is_ok() {
+                        with_app(|app| app.start_with_windows = !checked);
+                    }
+                }
+                Some(MENU_QUIT) => {
+                    let _ = slint::quit_event_loop();
+                }
+                _ => {}
             }
         }
     }

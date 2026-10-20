@@ -9,5 +9,6 @@ pub mod history;
 pub mod metric;
 pub mod sparkline;
 pub mod status_dot;
+pub mod task_xml;
 pub mod tray_art;
 pub mod warning;
