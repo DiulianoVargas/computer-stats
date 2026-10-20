@@ -1,0 +1,49 @@
+// One Drive: letter + label, free space, and a used-space bar (contracts/ui.md Rows).
+import { Theme } from "theme.slint";
+
+export struct DriveRowData {
+    // "C: System" or "C:"
+    label-text: string,
+    // "212 GB free of 931 GB", or "— reason" when unavailable.
+    free-text: string,
+    // 0.0–1.0
+    used-fraction: float,
+    unavailable: bool,
+    // Warning Level: 0 Normal (or none), 1 Warning, 2 Critical.
+    level: int,
+}
+
+export component DriveRow inherits VerticalLayout {
+    in property <DriveRowData> data;
+
+    spacing: 3px;
+    height: 32px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: data.label-text;
+            color: Theme.text;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: data.free-text;
+            color: data.unavailable ? Theme.muted-text : Theme.level-text(data.level);
+            horizontal-alignment: right;
+        }
+    }
+
+    Rectangle {
+        height: 6px;
+        border-radius: 3px;
+        background: Theme.bar-track;
+        Rectangle {
+            x: 0;
+            width: data.unavailable ? 0 : parent.width * clamp(data.used-fraction, 0, 1);
+            height: parent.height;
+            border-radius: parent.border-radius;
+            background: Theme.level-bar(data.level);
+        }
+    }
+}

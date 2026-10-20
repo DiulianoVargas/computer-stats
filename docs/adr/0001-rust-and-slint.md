@@ -5,4 +5,4 @@ Lowest possible RAM is the top non-functional goal, so the app is written in Rus
 ## Consequences
 
 - CPU Temperature cannot use LibreHardwareMonitorLib (.NET); it must be read from Rust, talking to a kernel driver directly (see ADR-0002).
-- Per-app audio uses the Windows Core Audio COM APIs via the `windows` crate; GPU Metrics use NVML.
+- Per-app audio uses the Windows Core Audio COM APIs via the `windows` crate; GPU Metrics use NVML (superseded by ADR-0003: Windows graphics statistics).

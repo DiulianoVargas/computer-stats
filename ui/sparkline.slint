@@ -1,0 +1,19 @@
+// A Metric's last 60 seconds (research R11). `commands` comes from `domain::sparkline::path`.
+export component Sparkline inherits Rectangle {
+    in property <string> commands;
+    in property <brush> stroke;
+
+    width: 60px;
+    height: 20px;
+
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 60;
+        viewbox-height: 20;
+        commands: root.commands;
+        stroke: root.stroke;
+        stroke-width: 1.5px;
+        fill: transparent;
+    }
+}

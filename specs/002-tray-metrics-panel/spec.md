@@ -1,6 +1,6 @@
 # Feature Specification: Tray Icon and Metrics Panel
 
-**Feature Branch**: `002-tray-metrics-panel` (no git repository yet)
+**Feature Branch**: `002-tray-metrics-panel`
 
 **Created**: 2026-10-20
 

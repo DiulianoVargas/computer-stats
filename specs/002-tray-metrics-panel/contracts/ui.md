@@ -32,8 +32,9 @@ What the user sees and can do. Tests and the quickstart check against this.
 
 ## Panel
 
-Width 340 logical px; height fits content (max 640, Drives scroll after 6). Rounded corners,
-1 px border, theme background, 16 px padding, 12 px between sections.
+Width 320 logical px; height fits content (max 640, Drives scroll after 6). Rounded corners,
+1 px border, theme background, 12 px padding, 8 px between sections, 2 px between rows
+(compacted on 2026-10-20 after user feedback: "muito espaço em branco").
 
 ```text
 ┌────────────────────────────────────────┐

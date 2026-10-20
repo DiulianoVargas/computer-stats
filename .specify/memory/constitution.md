@@ -1,9 +1,10 @@
 <!--
 Sync Impact Report
-- Version change: (template) → 1.0.0
-- Modified principles: none (initial ratification)
-- Added sections: Core Principles I–IX, Technical Constraints, Quality Gates, Governance
-- Removed sections: none
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: III. Unsafe Isolation (FFI list: NVML → D3DKMT)
+- Modified sections: Technical Constraints (GPU data source: NVML → Windows graphics statistics,
+  ADR-0003)
+- Rationale: NVML cost ≈ 19.5 MB private memory, leaving no headroom in Principle I's 30 MB budget
 - Templates requiring updates: none (templates read the constitution at runtime)
 - Follow-up TODOs: none
 -->
@@ -38,7 +39,7 @@ ADR-0001.
 
 ### III. Unsafe Isolation (NON-NEGOTIABLE)
 
-- All `unsafe` code and FFI (Core Audio COM, NVML, PawnIO) MUST live in a single `platform`
+- All `unsafe` code and FFI (Core Audio COM, D3DKMT, PawnIO) MUST live in a single `platform`
   module behind safe APIs.
 - Every other module MUST declare `#![deny(unsafe_code)]`.
 
@@ -102,9 +103,9 @@ Rationale: one vocabulary across conversation, specs, and code prevents drift an
 
 - Language and UI: Rust (stable) + Slint (ADR-0001).
 - Platform: Windows 11, always elevated (ADR-0002).
-- Data sources: Windows Core Audio COM via the `windows` crate (App Volume, Audio Level); NVML
-  (GPU Usage, VRAM, GPU Temperature); PawnIO driver (CPU Temperature); Windows system APIs
-  (CPU Usage, Memory Usage, Disk Space).
+- Data sources: Windows Core Audio COM via the `windows` crate (App Volume, Audio Level); Windows
+  kernel graphics statistics, D3DKMT in `gdi32.dll` (GPU Usage, VRAM, GPU Temperature; ADR-0003);
+  PawnIO driver (CPU Temperature); Windows system APIs (CPU Usage, Memory Usage, Disk Space).
 - Release profile: `lto = true`, `codegen-units = 1`, `panic = "abort"`, `strip = true`.
 
 ## Quality Gates
@@ -128,4 +129,4 @@ Every release MUST additionally pass the resource-budget measurement script (Pri
 - Plans MUST include a constitution check; any deviation MUST be justified in the plan's
   complexity tracking.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-19
+**Version**: 1.1.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-20

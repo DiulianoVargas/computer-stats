@@ -1,0 +1,35 @@
+# Constitution II (native only), IV (no network), VI (dependency discipline).
+
+[graph]
+targets = ["x86_64-pc-windows-msvc"]
+
+[bans]
+multiple-versions = "warn"
+deny = [
+    # II. Native only: no web views
+    { name = "wry" },
+    { name = "webview2-com" },
+    { name = "tauri" },
+    # IV. Elevated minimal surface: no network
+    { name = "reqwest" },
+    { name = "hyper" },
+    { name = "ureq" },
+    { name = "curl" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Zlib",
+    "BSL-1.0",
+    "CC0-1.0",
+    # Slint, used under its royalty-free license (attribution in README.md).
+    "LicenseRef-Slint-Royalty-free-2.0",
+]
+private = { ignore = true }
+
+[advisories]
