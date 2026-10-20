@@ -56,11 +56,9 @@ fn bmp_entry(size: u32) -> Vec<u8> {
             let a = (p >> 24) & 0xFF;
             // Premultiplied → straight.
             let un = |c: u32| {
-                if a == 0 {
-                    0
-                } else {
-                    ((c * 255 + a / 2) / a).min(255) as u8
-                }
+                (c * 255 + a / 2)
+                    .checked_div(a)
+                    .map_or(0, |v| v.min(255) as u8)
             };
             out.extend_from_slice(&[
                 un(p & 0xFF),
