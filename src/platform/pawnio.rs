@@ -1,5 +1,5 @@
-//! CPU Temperature through PawnIO and its `AMDFamily17.bin` module, from spike 001
-//! (`spikes/cpu-temp/src/platform.rs`; verdict Confirmed). Opened once for the app's lifetime.
+//! CPU Temperature through PawnIO: the `AMDFamily17.bin` module on AMD (spike 001, verdict
+//! Confirmed) or `IntelMSR.bin` on Intel (feature 004). Opened once for the app's lifetime.
 
 use std::ffi::{OsStr, c_char, c_void};
 use std::os::windows::ffi::OsStrExt;
@@ -12,14 +12,18 @@ use windows::Win32::System::Registry::{HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ, RegGet
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::core::{PCSTR, PCWSTR, s, w};
 
-use crate::domain::cpu_temp::{self, THM_TCON_CUR_TMP};
+use crate::domain::cpu_temp::{
+    self, CpuKind, MSR_PACKAGE_THERM_STATUS, MSR_TEMPERATURE_TARGET, MSR_THERM_STATUS,
+    THM_TCON_CUR_TMP,
+};
 use crate::domain::metric::{Reading, Reason};
 
-const MODULE_FILE: &str = "AMDFamily17.bin";
-
-/// The CPU Temperature sensor: an open PawnIO handle with the AMD module loaded.
+/// The CPU Temperature sensor: an open PawnIO handle with the module for this CPU loaded.
 pub struct CpuTemperatureSource {
     pawnio: PawnIo,
+    kind: CpuKind,
+    /// Intel only: TjMax, read once at open.
+    tjmax: f32,
 }
 
 impl CpuTemperatureSource {
@@ -29,22 +33,46 @@ impl CpuTemperatureSource {
             return Err(Reason::NotElevated);
         }
         let (vendor, family) = cpu_vendor_family();
-        if !cpu_temp::is_supported(&vendor, family) {
-            return Err(Reason::UnsupportedCpu);
-        }
+        let (has_dts, has_ptm) = thermal_features();
+        let kind =
+            cpu_temp::cpu_kind(&vendor, family, has_dts, has_ptm).ok_or(Reason::UnsupportedCpu)?;
+        let module_file = match kind {
+            CpuKind::Amd => "AMDFamily17.bin",
+            CpuKind::Intel { .. } => "IntelMSR.bin",
+        };
         let module = std::env::current_exe()
             .map_err(|_| Reason::ModuleNotFound)?
-            .with_file_name(MODULE_FILE);
+            .with_file_name(module_file);
+        let pawnio = PawnIo::open(&module)?;
+        let tjmax = match kind {
+            CpuKind::Amd => 0.0,
+            CpuKind::Intel { .. } => {
+                cpu_temp::intel_tjmax(pawnio.read_msr(MSR_TEMPERATURE_TARGET)?)
+            }
+        };
         Ok(CpuTemperatureSource {
-            pawnio: PawnIo::open(&module)?,
+            pawnio,
+            kind,
+            tjmax,
         })
     }
 
     pub fn read(&self) -> Reading {
-        match self.pawnio.read_smn(THM_TCON_CUR_TMP) {
-            Ok(raw) => cpu_temp::classify(raw),
-            Err(reason) => Reading::Unavailable(reason),
-        }
+        let reading = match self.kind {
+            CpuKind::Amd => self
+                .pawnio
+                .execute(c"ioctl_read_smn", THM_TCON_CUR_TMP as u64)
+                .map(|raw| cpu_temp::classify(raw as u32)),
+            CpuKind::Intel { package: true } => self
+                .pawnio
+                .read_msr(MSR_PACKAGE_THERM_STATUS)
+                .map(|status| cpu_temp::intel_package(status, self.tjmax)),
+            CpuKind::Intel { package: false } => self
+                .pawnio
+                .read_msr(MSR_THERM_STATUS)
+                .map(|status| cpu_temp::intel_core(status, self.tjmax)),
+        };
+        reading.unwrap_or_else(Reading::Unavailable)
     }
 }
 
@@ -93,6 +121,21 @@ fn cpu_vendor_family() -> ([u8; 12], u32) {
         base
     };
     (vendor, family)
+}
+
+/// CPUID leaf 6 EAX: digital thermal sensor (bit 0) and package thermal management (bit 6).
+/// Both false when the CPU does not report leaf 6.
+fn thermal_features() -> (bool, bool) {
+    use core::arch::x86_64::__cpuid;
+    // SAFETY: CPUID is available on every x86_64 CPU; leaf 6 is read only if reported.
+    #[allow(unused_unsafe)]
+    let max_leaf = unsafe { __cpuid(0) }.eax;
+    if max_leaf < 6 {
+        return (false, false);
+    }
+    #[allow(unused_unsafe)]
+    let eax = unsafe { __cpuid(6) }.eax;
+    (eax & 1 != 0, eax & (1 << 6) != 0)
 }
 
 // --- PawnIO ------------------------------------------------------------------
@@ -179,16 +222,17 @@ impl PawnIo {
         })
     }
 
-    /// Reads one 32-bit SMN register through the module's `ioctl_read_smn`.
-    fn read_smn(&self, offset: u32) -> Result<u32, Reason> {
-        let input = [offset as u64];
+    /// Calls a module function that takes one input cell and returns one output cell (the AMD
+    /// module's `ioctl_read_smn`, the Intel module's `ioctl_read_msr`).
+    fn execute(&self, function: &std::ffi::CStr, input: u64) -> Result<u64, Reason> {
+        let input = [input];
         let mut output = [0u64; 1];
         let mut returned = 0usize;
         // SAFETY: buffers are valid for the lengths passed; the function name is NUL-terminated.
         let hr = unsafe {
             (self.execute)(
                 self.handle,
-                c"ioctl_read_smn".as_ptr(),
+                function.as_ptr(),
                 input.as_ptr(),
                 input.len(),
                 output.as_mut_ptr(),
@@ -199,7 +243,12 @@ impl PawnIo {
         if hr < 0 || returned != 1 {
             return Err(Reason::ReadFailed);
         }
-        Ok(output[0] as u32)
+        Ok(output[0])
+    }
+
+    /// Reads one MSR through the Intel module (only its whitelisted thermal MSRs succeed).
+    fn read_msr(&self, msr: u32) -> Result<u64, Reason> {
+        self.execute(c"ioctl_read_msr", msr as u64)
     }
 }
 
