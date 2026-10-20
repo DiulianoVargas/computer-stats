@@ -7,7 +7,7 @@ A lightweight, easy-to-read visualizer for a Windows PC's resource usage and per
 ### General
 
 **App**:
-A Windows program running on this PC that the visualizer can report on. A program with several audio sessions (e.g. a browser) is still one App.
+A Windows program running on this PC that the visualizer can report on, identified by its program file. A program with several audio sessions or several Processes (e.g. a browser) is still one App. In the Processes View this includes Windows' own programs and services.
 _Avoid_: APK, application package, process (unless meaning the OS process specifically)
 
 **Tray Icon**:
@@ -27,8 +27,24 @@ The colored dot drawn on the Tray Icon showing the worst Warning Level across al
 _Avoid_: Badge, indicator
 
 **Panel**:
-The popup showing all Metrics and App Volumes. It opens anchored above the Tray Icon on left-click and closes when the user clicks anywhere else.
+The popup that opens anchored above the Tray Icon on left-click and closes when the user clicks anywhere else. It has two Views, switched with tabs at its top: the Metrics View and the Processes View.
 _Avoid_: Widget, window, dashboard, menu, flyout
+
+**Metrics View**:
+The Panel's default View: all Metrics and App Volumes.
+_Avoid_: Main tab, home
+
+**Processes View**:
+The Panel's second View: every running App with its CPU and memory use, where the user can End an App.
+_Avoid_: Task manager, process list, details
+
+**Process**:
+One running OS process (one PID). An App is made of one or more Processes started from the same program file. Shown to the user only as a count on an App.
+_Avoid_: Task, job
+
+**End App**:
+Forcibly stopping every Process of an App from the Processes View, after the user confirms in place. Unsaved work in that App is lost.
+_Avoid_: Kill, terminate (in user-facing text)
 
 ### Metrics
 
