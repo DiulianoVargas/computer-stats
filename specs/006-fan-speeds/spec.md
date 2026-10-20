@@ -77,11 +77,10 @@ value within 5 % of the GPU vendor's tool or HWiNFO over 1 minute, rising under 
 1. **Given** a GPU whose driver reports fan speed, **When** the user opens the Panel, **Then** the
    GPU section has a Fan row with RPM and a Sparkline.
 2. **Given** a GPU whose fans stop at idle (zero-RPM mode), **When** the GPU is idle, **Then** the
-   row shows `0 RPM`.
+   row shows `0 RPM`, from the first second (as iCUE does).
 3. **Given** a GPU driver that does not report fan speed, **When** the user opens the Panel,
-   **Then** the GPU Fan row shows `— not reported`. The driver reports a stopped fan and a
-   missing reading alike, so GPU Fan shows `— not reported` until the driver has reported a speed
-   above 0 once; after that, 0 shows as `0 RPM`.
+   **Then** the GPU Fan row shows `0 RPM`: the driver reports a stopped fan and a missing reading
+   alike, and a stopped fan is the common case (revised 2026-10-20, see Clarifications).
 4. **Given** no dedicated GPU, **When** the user opens the Panel, **Then** the GPU Fan row shows
    `— no GPU`, as the other GPU Metrics do.
 
@@ -139,8 +138,8 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
   S1), so the list starts empty.
 - **FR-003**: A fan header MUST be shown only once it has reported a speed above 0 since the app
   started, and MUST then stay listed (showing `0 RPM` when stopped) until the app restarts.
-- **FR-004**: The GPU section MUST show a GPU Fan row with RPM and a Sparkline when the GPU driver
-  reports fan speed, and `— not reported` when it does not.
+- **FR-004**: The GPU section MUST show a GPU Fan row with RPM and a Sparkline. A speed of 0 (fans
+  stopped, or not reported by the driver) MUST show as `0 RPM`.
 - **FR-005**: When fan speeds cannot be read, the Fans section MUST show one row with the reason,
   using the same wording as CPU Temperature where the cause is shared (`— not elevated`,
   `— driver not found`, `— module not found`, `— read failed`), plus `— unsupported
@@ -230,3 +229,6 @@ group and GPU Fan in the GPU group, with the same values and Sparklines as in th
 - Q (2026-10-20): should Gigabyte boards be supported, as on a user's B550M AORUS ELITE where iCUE
   shows every fan? → A: Yes: ITE IT8628E / IT8686E / IT8688E (research R9), validated by that
   user.
+- Q (2026-10-20, after the Gigabyte test): a GPU whose fans stop at idle showed `— not reported`;
+  shouldn't a stopped fan just show as not spinning? → A: Yes. GPU Fan shows `0 RPM` whenever the
+  driver reports 0, like iCUE; the "not reported" state is removed (FR-004).

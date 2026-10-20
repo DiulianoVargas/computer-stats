@@ -1,5 +1,5 @@
 //! Fan Speeds (006 data-model): the supported monitoring chips, fan count → RPM, which motherboard
-//! Fans are shown and with what label, and the GPU Fan's "not reported" rule.
+//! Fans are shown and with what label, and the GPU Fan reading.
 
 use super::history::History;
 use super::metric::{MAX_FAN_RPM, MetricKind, Reading, Reason};
@@ -274,24 +274,10 @@ impl FanList {
     }
 }
 
-/// The GPU driver reports a stopped fan and a missing reading alike as 0, so the GPU Fan shows
-/// "not reported" until it has once been above 0 (research R1).
-#[derive(Debug, Clone, Copy, Default)]
-pub struct GpuFanState {
-    reported: bool,
-}
-
-impl GpuFanState {
-    pub fn next(&mut self, rpm: u32) -> Reading {
-        if rpm > 0 {
-            self.reported = true;
-        }
-        if self.reported {
-            fan_reading(rpm as f32)
-        } else {
-            Reading::Unavailable(Reason::NotReported)
-        }
-    }
+/// The GPU Fan from the driver's `FanRPM`: a stopped fan (zero-RPM mode at idle) shows `0 RPM`,
+/// like iCUE does (research R1, revised).
+pub fn gpu_fan(rpm: u32) -> Reading {
+    fan_reading(rpm as f32)
 }
 
 #[cfg(test)]
@@ -473,10 +459,9 @@ mod tests {
     }
 
     #[test]
-    fn gpu_fan_is_not_reported_until_it_spins() {
-        let mut state = GpuFanState::default();
-        assert_eq!(state.next(0), Reading::Unavailable(Reason::NotReported));
-        assert_eq!(state.next(830).value(), Some(830.0));
-        assert_eq!(state.next(0).value(), Some(0.0));
+    fn a_stopped_gpu_fan_reads_zero() {
+        assert_eq!(gpu_fan(0).value(), Some(0.0));
+        assert_eq!(gpu_fan(830).value(), Some(830.0));
+        assert_eq!(gpu_fan(20_000), Reading::Unavailable(Reason::ReadFailed));
     }
 }

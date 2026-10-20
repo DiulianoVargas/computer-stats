@@ -148,9 +148,12 @@ Measured on a Ryzen 9 7900 with Windows 11 and about 300 running processes:
   against reads (common on ASUS boards). The app clears that lock, like HWiNFO and iCUE do; this
   message means clearing it failed.
 - **Fans show `— unsupported motherboard`** — the board's monitoring chip is not one the app
-  knows yet (see the table above).
-- **GPU fan shows `— not reported`** — the GPU driver has not reported a fan speed yet. Some GPUs
-  stop their fans when idle and report 0; the value appears once the fan first spins.
+  knows yet (see the table above). Please open an
+  [issue](https://github.com/DiulianoVargas/computer-stats/issues) with your board's model and
+  the line starting with `fans:` from `%LOCALAPPDATA%\Computer Stats\crash.log`, so it can be
+  added.
+- **GPU fan shows `0 RPM`** — most graphics cards stop their fans when idle (zero-RPM mode); the
+  value rises when the card warms up.
 - **The app closed unexpectedly** — please open an
   [issue](https://github.com/DiulianoVargas/computer-stats/issues) and attach
   `%LOCALAPPDATA%\Computer Stats\crash.log`.

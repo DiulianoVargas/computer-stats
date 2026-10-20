@@ -32,7 +32,7 @@ Drives
   - Unavailable → one full-width line `— {reason}` in the muted colour under the header.
   - Readable but no fan has spun yet → the section is not shown.
 - **Reasons**: `— not elevated`, `— driver not found`, `— module not found`, `— read failed`,
-  `— unsupported motherboard`, `— locked by firmware`; GPU Fan also `— not reported`.
+  `— unsupported motherboard`, `— locked by firmware`. A stopped GPU fan shows `0 RPM`.
 
 ## Desktop Widget
 

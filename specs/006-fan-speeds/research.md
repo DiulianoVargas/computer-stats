@@ -10,7 +10,10 @@ GTX 1660 SUPER + integrated Radeon, PawnIO 2.2.0, PawnIO.Modules 0.2.11. Spike c
   for GPU Temperature (ADR-0003). One more field read; no new call.
 - **Spike S2 result**: the GTX 1660 SUPER reports `FanRPM = 830` at idle (HWiNFO agrees); the
   integrated Radeon reports 0.
-- **Stopped vs not reported**: the driver uses 0 for both. GPU Fan shows `— not reported` until
+- **Revised 2026-10-20**: GPU Fan shows `0 RPM` for 0 from the first second, like iCUE; the
+  "not reported" state is removed (spec FR-004). A dedicated GPU whose driver never fills
+  `FanRPM`, or a fanless card, then reads `0 RPM`; accepted. The original rule follows.
+- **Stopped vs not reported (original)**: the driver uses 0 for both. GPU Fan shows `— not reported` until
   `FanRPM` has been above 0 once in this run, then `0 RPM` for 0 (spec US2.3). A zero-RPM GPU idle
   since boot therefore shows `— not reported` until it first spins; accepted.
 - **Plausibility**: above 10 000 RPM → `read failed` for that second (gap).
