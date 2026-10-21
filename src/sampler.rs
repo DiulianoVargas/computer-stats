@@ -24,6 +24,9 @@ const TICK: Duration = Duration::from_secs(1);
 const JOIN_LIMIT: Duration = Duration::from_secs(2);
 /// How often the Drive list is re-enumerated (FR-022: within 5 s of a change).
 const DRIVE_ENUMERATION: Duration = Duration::from_secs(5);
+/// How often a lost or missing GPU is opened again. A driver update or reset invalidates the open
+/// adapter handle, and the adapter returns with a new LUID.
+const GPU_REOPEN: Duration = Duration::from_secs(5);
 
 /// All per-tick state and Metric sources. Created on the sampler thread, so sources that are not
 /// `Send` (raw driver handles) never cross threads. A source that failed to open yields its
@@ -32,6 +35,7 @@ struct Sampler {
     cpu: CpuTimes,
     cpu_temperature: Result<CpuTemperatureSource, Reason>,
     gpu: Result<GpuSource, Reason>,
+    gpu_opened: Instant,
     /// Motherboard Fans (006).
     fans: Result<FanSource, Reason>,
     fan_list: FanList,
@@ -55,6 +59,7 @@ impl Sampler {
             cpu: CpuTimes::new(),
             cpu_temperature: CpuTemperatureSource::open(),
             gpu: GpuSource::open(),
+            gpu_opened: Instant::now(),
             fans: FanSource::open(),
             fan_list: FanList::new(&superio::board_product()),
             drive_letters: Vec::new(),
@@ -91,6 +96,12 @@ impl Sampler {
             Ok(source) => source.read(),
             Err(reason) => GpuReadings::unavailable(*reason),
         };
+        if gpu.lost() && self.gpu_opened.elapsed() >= GPU_REOPEN {
+            // Close the old handle before enumerating again.
+            self.gpu = Err(Reason::ReadFailed);
+            self.gpu = GpuSource::open();
+            self.gpu_opened = Instant::now();
+        }
         let cpu_temperature = match &self.cpu_temperature {
             Ok(source) => source.read(),
             Err(reason) => Reading::Unavailable(*reason),

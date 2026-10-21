@@ -35,6 +35,13 @@ impl GpuReadings {
             vram: Reading::Unavailable(reason),
         }
     }
+
+    /// Usage and VRAM both failed: the adapter is gone (driver updated or reset) or never opened.
+    /// Temperature and Fan are left out, since some drivers never report them.
+    pub fn lost(&self) -> bool {
+        matches!(self.usage, Reading::Unavailable(_))
+            && matches!(self.vram, Reading::Unavailable(_))
+    }
 }
 
 /// An open handle to the GPU. Closed on drop.
